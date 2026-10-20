@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import { ArrowUpRight, Menu } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
@@ -10,10 +11,19 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 import { publicNavigation } from "@/config/site";
 import { cn } from "@/lib/utils";
 
+function subscribeToScroll(onChange: () => void) {
+  window.addEventListener("scroll", onChange, { passive: true });
+  return () => window.removeEventListener("scroll", onChange);
+}
+
+const getScrolledSnapshot = () => window.scrollY > 12;
+const getServerScrolledSnapshot = () => false;
+
 export function SplitDock() {
   const pathname = usePathname();
+  const scrolled = useSyncExternalStore(subscribeToScroll, getScrolledSnapshot, getServerScrolledSnapshot);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  return <header className="site-header">
+  return <header className="site-header" data-scrolled={scrolled}>
     <a href="#main-content" className="skip-link">Skip to content</a>
     <nav aria-label="Main navigation" className="split-dock">
       <div className="dock-capsule brand-capsule"><BrandMark /></div>
@@ -23,8 +33,8 @@ export function SplitDock() {
       </div>
       <div className="dock-capsule action-capsule">
         <ThemeToggle />
-        <Button variant="ghost" size="sm" asChild className="hidden min-[390px]:inline-flex"><Link href="/login">Log in</Link></Button>
-        <Button size="sm" asChild className="hidden md:inline-flex"><Link href="/register">Get started <ArrowUpRight aria-hidden="true" /></Link></Button>
+        <Button variant="ghost" size="sm" asChild className="hidden min-[390px]:inline-flex"><Link href="/login" aria-current={pathname === "/login" ? "page" : undefined}>Log in</Link></Button>
+        <Button size="sm" asChild className="hidden md:inline-flex"><Link href="/register" aria-current={pathname === "/register" ? "page" : undefined}>Get started <ArrowUpRight aria-hidden="true" /></Link></Button>
         <Sheet>
           <SheetTrigger asChild><Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu"><Menu aria-hidden="true" /></Button></SheetTrigger>
           <SheetContent>

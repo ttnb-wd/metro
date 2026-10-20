@@ -1,22 +1,24 @@
 import Link from "next/link";
 import { ArrowUpRight, CircleUserRound, ShieldCheck, SlidersHorizontal, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { secureAccess, type ServiceDefinition } from "@/config/services";
 
-export function ServiceCard({ detailed = false }: { detailed?: boolean }) {
+export function ServiceCard({ detailed = false, service = secureAccess, headingLevel = 3 }: { detailed?: boolean; service?: ServiceDefinition; headingLevel?: 2 | 3 }) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return <article className="service-card">
     <div className="service-copy">
-      <div className="flex items-center justify-between gap-3"><span className="eyebrow text-muted-foreground">01 / OUR FIRST SERVICE</span><span className="service-tag">VPN</span></div>
-      <div className="service-title"><span className="service-icon"><ShieldCheck size={25} strokeWidth={1.5} aria-hidden="true" /></span><h3>Secure Access</h3></div>
-      <p className="service-description">A VPN service, with a dedicated place for your plan and setup. Your first digital essential on Metro.</p>
-      {detailed && <p className="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">Explore the service today. Account creation, purchases, and connection setup will become available in a later release.</p>}
-      <Button variant="secondary" asChild className="mt-6"><Link href="/services/secure-access">Explore Secure Access <ArrowUpRight aria-hidden="true" /></Link></Button>
+      <div className="flex items-center justify-between gap-3"><span className="eyebrow text-muted-foreground">CURRENT SERVICE</span><span className="service-tag">{service.category}</span></div>
+      <div className="service-title"><span className="service-icon"><ShieldCheck size={25} strokeWidth={1.5} aria-hidden="true" /></span><Heading>{service.name}</Heading></div>
+      <p className="service-description">{service.description}</p>
+      {detailed && <p className="catalog-service-note">Available through Outline Client for desktop and mobile. Website ordering is not yet enabled.</p>}
+      <div className="service-actions"><Button variant="secondary" asChild><Link href={service.href}>Service details <ArrowUpRight aria-hidden="true" /></Link></Button><Link href={service.plansHref} className="text-link gap-2 text-xs">View plans <ArrowUpRight size={13} aria-hidden="true" /></Link></div>
     </div>
     <div className="service-map" aria-label="Planned customer flow: your account, Secure Access, guided setup">
       <div className="map-caption"><span className="tiny-square" /> ONE CONNECTED EXPERIENCE</div>
       <div className="map-flow">
         <div className="map-node"><CircleUserRound size={19} aria-hidden="true" /><span>Your account</span></div>
         <div className="map-connector"><span /><ArrowRight size={12} aria-hidden="true" /></div>
-        <div className="map-node map-node-featured"><ShieldCheck size={24} aria-hidden="true" /><span>Secure Access</span></div>
+        <div className="map-node map-node-featured"><ShieldCheck size={24} aria-hidden="true" /><span>{service.name}</span></div>
         <div className="map-connector"><span /><ArrowRight size={12} aria-hidden="true" /></div>
         <div className="map-node"><SlidersHorizontal size={19} aria-hidden="true" /><span>Guided setup</span></div>
       </div>

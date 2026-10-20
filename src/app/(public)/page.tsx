@@ -3,7 +3,6 @@ import { ArrowRight, ArrowUpRight, Layers3, LayoutGrid, UserRound, Compass, Move
 import { Button } from "@/components/ui/button";
 import { ServiceCard } from "@/components/marketing/service-card";
 import { Reveal } from "@/components/marketing/reveal";
-import { site } from "@/config/site";
 
 const steps = [
   { number: "01", title: "Find your essential.", description: "Explore the service, understand what it offers, and find what fits your needs.", icon: Compass },
@@ -18,13 +17,13 @@ export default function Home() {
       <Reveal className="hero-content">
         <p className="eyebrow hero-eyebrow"><span className="eyebrow-line" />YOUR DIGITAL SERVICES, CONNECTED</p>
         <h1 id="hero-heading">Your digital essentials.<br /><span>One place.</span></h1>
-        <p className="hero-description">{site.description}</p>
-        <div className="hero-actions"><Button size="lg" asChild><Link href="/services">Explore services <ArrowUpRight aria-hidden="true" /></Link></Button><Button size="lg" variant="secondary" asChild><Link href="/register">Create account <ArrowRight aria-hidden="true" /></Link></Button></div>
-        <p className="hero-footnote">Starting with Secure Access. Built to bring more together.</p>
+        <p className="hero-description">Digital services, brought together by Metro. Start with <strong>Secure Access VPN</strong> and explore a plan that fits your needs.</p>
+        <div className="hero-actions"><Button size="lg" asChild><Link href="/services/secure-access">Explore Secure Access <ArrowUpRight aria-hidden="true" /></Link></Button><Button size="lg" variant="secondary" asChild><Link href="/plans">Estimate your plan <ArrowRight aria-hidden="true" /></Link></Button></div>
+        <p className="hero-footnote">Our first service is here to explore. Website purchases are coming later.</p>
       </Reveal>
     </section>
     <section className="service-section page-container" aria-labelledby="available-heading">
-      <div className="section-caption"><h2 id="available-heading">Meet your first essential</h2><span className="caption-aside">THE METRO COLLECTION / 01</span></div>
+      <div className="section-caption"><h2 id="available-heading">Available service</h2><span className="caption-aside">THE METRO COLLECTION / 01</span></div>
       <ServiceCard />
     </section>
     <section className="how-section page-container" aria-labelledby="how-heading">
