@@ -1,0 +1,45 @@
+# Private environment configuration
+.env
+.env.*
+
+# Dependencies and generated outputs
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.nyc_output/
+artifacts/
+*.tsbuildinfo
+
+# Local documentation (keep files on disk)
+*.md
+
+# Tests, fixtures, and test reports (keep files on disk)
+*.test.*
+*.spec.*
+test/
+tests/
+spec/
+specs/
+__tests__/
+__mocks__/
+__fixtures__/
+e2e/
+playwright-report/
+test-results/
+
+# Temporary files, local caches, and logs
+tmp/
+temp/
+.tmp/
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.log
+.DS_Store
+Thumbs.db

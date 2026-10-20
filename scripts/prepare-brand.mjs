@@ -1,0 +1,22 @@
+import { mkdir, copyFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import sharp from "sharp";
+
+const root = new URL("../", import.meta.url);
+const original = fileURLToPath(new URL("metro-logo.png", root));
+await mkdir(new URL("public/brand/", root), { recursive: true });
+await copyFile(original, new URL("public/brand/metro-logo.png", root));
+await sharp(original).resize(192, 192).png().toFile(fileURLToPath(new URL("src/app/icon.png", root)));
+await sharp(original).resize(180, 180).png().toFile(fileURLToPath(new URL("src/app/apple-icon.png", root)));
+const png = await sharp(original).resize(32, 32).ensureAlpha().png().toBuffer();
+const header = Buffer.alloc(22);
+header.writeUInt16LE(1, 2);
+header.writeUInt16LE(1, 4);
+header[6] = 32;
+header[7] = 32;
+header.writeUInt16LE(1, 10);
+header.writeUInt16LE(32, 12);
+header.writeUInt32LE(png.length, 14);
+header.writeUInt32LE(22, 18);
+await writeFile(new URL("src/app/favicon.ico", root), Buffer.concat([header, png]));
+console.log("Copied original Metro artwork and generated browser icons. Root logo unchanged.");
