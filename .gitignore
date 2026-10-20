@@ -1,6 +1,7 @@
 # Private environment configuration
 .env
 .env.*
+!.env.example
 
 # Dependencies and generated outputs
 node_modules/
@@ -12,6 +13,7 @@ coverage/
 .nyc_output/
 artifacts/
 *.tsbuildinfo
+src/server/db/generated/
 
 # Local documentation (keep files on disk)
 *.md

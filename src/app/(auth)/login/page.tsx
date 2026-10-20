@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
-import { AuthPreview } from "@/components/forms/auth-preview";
+import { redirect } from "next/navigation";
+import { AuthForm } from "@/components/forms/auth-form";
+import { getWebsiteSession } from "@/server/auth/session";
+import { safeReturnPath } from "@/server/auth/redirects";
+import { canonicalizeAuthPage } from "@/server/auth/canonical-origin";
 
-export const metadata: Metadata = { title: "Log in preview" };
-export default function LoginPage() { return <AuthPreview mode="login" />; }
+export const metadata: Metadata = { title: "Log in" };
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; registered?: string }> }) {
+  const query = await searchParams;
+  await canonicalizeAuthPage("/login", query);
+  const returnTo = safeReturnPath(query.next);
+  if (await getWebsiteSession()) redirect(returnTo);
+  return <AuthForm mode="login" returnTo={returnTo} registered={query.registered === "1"} />;
+}

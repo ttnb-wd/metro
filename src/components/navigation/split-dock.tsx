@@ -43,7 +43,7 @@ export function SplitDock() {
             <div className="mt-8 flex flex-col gap-2">
               {[{ href: "/", label: "Home" }, ...publicNavigation, { href: "/login", label: "Log in" }, { href: "/register", label: "Create account" }].map(item => <SheetClose asChild key={item.href}><Link href={item.href} aria-current={(item.href === "/" ? pathname === "/" : isActive(item.href)) ? "page" : undefined} className="flex min-h-12 items-center justify-between rounded-xl px-4 text-sm hover:bg-secondary aria-[current=page]:bg-secondary aria-[current=page]:text-accent">{item.label}<ArrowUpRight size={16} aria-hidden="true" /></Link></SheetClose>)}
             </div>
-            <p className="mt-auto pt-8 text-xs leading-6 text-muted-foreground">Account and checkout screens are previews in this version.</p>
+            <p className="mt-auto pt-8 text-xs leading-6 text-muted-foreground">Sign in to your Metro account. Checkout and service management remain in preview.</p>
           </SheetContent>
         </Sheet>
       </div>

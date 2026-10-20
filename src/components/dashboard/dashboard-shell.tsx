@@ -2,26 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelsTopLeft, LayoutGrid, ShieldCheck, ShoppingBag, CreditCard, Settings, PanelLeft, ArrowUpRight } from "lucide-react";
-import { dashboardNavigation } from "@/config/site";
-import { PreviewNotice } from "@/components/preview/preview-notice";
+import { ArrowUpRight, Menu } from "lucide-react";
+import { BrandMark } from "@/components/brand/brand-mark";
+import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { WorkspaceNavigation } from "@/components/dashboard/workspace-navigation";
+import { AccountMenu, type WorkspaceAccount } from "@/components/dashboard/account-menu";
+import { dashboardNavigation } from "@/config/site";
 
-const icons = { overview: PanelsTopLeft, services: LayoutGrid, access: ShieldCheck, orders: ShoppingBag, billing: CreditCard, settings: Settings };
-
-function DashboardNav({ mobile = false }: { mobile?: boolean }) {
+export function DashboardShell({ children, account }: { children: React.ReactNode; account: WorkspaceAccount }) {
   const pathname = usePathname();
-  return <nav className="dashboard-nav" aria-label="Dashboard navigation">{dashboardNavigation.map(item => {
-    const Icon = icons[item.icon];
-    const link = <Link href={item.href} aria-current={pathname === item.href ? "page" : undefined}><Icon size={17} strokeWidth={1.5} aria-hidden="true" />{item.label}</Link>;
-    return mobile ? <SheetClose key={item.href} asChild>{link}</SheetClose> : <div key={item.href}>{link}</div>;
-  })}</nav>;
-}
-
-export function DashboardShell({ children }: { children: React.ReactNode }) {
-  return <div className="dashboard-wrap page-container"><aside className="dashboard-sidebar"><p className="eyebrow">YOUR WORKSPACE / PREVIEW</p><DashboardNav /><p className="mt-8 px-3 text-xs leading-6 text-muted-foreground">A preview of your future Metro account. No one is signed in.</p><Link href="/services" className="text-link mt-4 gap-2 px-3 text-xs">Explore services <ArrowUpRight size={13} aria-hidden="true" /></Link></aside>
-    <div className="dashboard-main"><div className="mobile-dashboard-menu"><Sheet><SheetTrigger asChild><Button variant="secondary"><PanelLeft aria-hidden="true" />Dashboard menu</Button></SheetTrigger><SheetContent><SheetTitle className="mt-2 font-display text-xl font-medium">Dashboard preview</SheetTitle><SheetDescription className="mb-7 mt-2 text-xs leading-6 text-muted-foreground">Public design preview. No account is signed in.</SheetDescription><DashboardNav mobile /></SheetContent></Sheet></div>
-      <PreviewNotice />{children}
-    </div></div>;
+  const current = dashboardNavigation.find(item => item.href === pathname)?.label ?? "Workspace";
+  return <div className="workspace-root">
+    <a href="#main-content" className="skip-link">Skip to workspace</a>
+    <aside className="workspace-sidebar" aria-label="Workspace sidebar">
+      <BrandMark className="workspace-brand" />
+      <div className="workspace-sidebar-heading"><span className="workspace-small-label">PERSONAL WORKSPACE</span><span className="workspace-sidebar-rule" /></div>
+      <WorkspaceNavigation />
+      <div className="workspace-sidebar-bottom"><p>Your digital essentials,<br />a little closer.</p><Link href="/">Back to Metro <ArrowUpRight size={14} aria-hidden="true" /></Link></div>
+    </aside>
+    <div className="workspace-stage">
+      <header className="workspace-topbar">
+        <div className="workspace-mobile-brand"><BrandMark className="workspace-brand" /></div>
+        <div className="workspace-breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>{current}</strong></div>
+        <div className="workspace-header-actions"><ThemeToggle /><AccountMenu account={account} />
+          <div className="workspace-mobile-menu"><Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Open workspace navigation"><Menu size={20} aria-hidden="true" /></Button></SheetTrigger>
+            <SheetContent className="workspace-drawer"><SheetTitle className="workspace-drawer-title">Your workspace</SheetTitle><SheetDescription className="workspace-drawer-description">Your services and account, together.</SheetDescription><WorkspaceNavigation mobile /></SheetContent>
+          </Sheet></div>
+        </div>
+      </header>
+      <main id="main-content" tabIndex={-1} className="workspace-content"><div className="workspace-page workspace-enter">{children}</div>
+        <footer className="workspace-footer"><span>Metro · Your personal workspace</span><Link href="/services">Discover services <ArrowUpRight size={13} aria-hidden="true" /></Link></footer>
+      </main>
+    </div>
+    <WorkspaceNavigation compact />
+  </div>;
 }
