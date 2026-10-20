@@ -36,6 +36,9 @@ const databaseUrlSchema = z.string().url().superRefine((value, context) => {
 const enabledSchema = gateSchema.extend({
   METRO_DATABASE_URL: databaseUrlSchema,
   METRO_DIRECT_DATABASE_URL: databaseUrlSchema.optional(),
+  // Transitional legacy access remains explicit until the approved role cutover.
+  METRO_DATABASE_RUNTIME_ROLE: z.enum(["neondb_owner", "metro_runtime"]).default("neondb_owner"),
+  METRO_WEBSITE_FOUNDATION_ENABLED: z.enum(["false", "true"]).default("false"),
   BETTER_AUTH_SECRET: z.string().min(32).max(512).refine(value =>
     !/^(.)\1+$/.test(value)
     && !/(?:replace[-_ ]?me|change[-_ ]?me|your[-_ ]?(?:auth[-_ ]?)?secret|^example)/i.test(value)),
@@ -49,6 +52,12 @@ const enabledSchema = gateSchema.extend({
   // Only configure after reviewing a proxy that overwrites this header.
   METRO_AUTH_TRUSTED_IP_HEADER: z.enum(["x-real-ip", "cf-connecting-ip"]).optional(),
 }).superRefine((value, context) => {
+  if (value.METRO_DATABASE_RUNTIME_ROLE === "metro_runtime" && value.METRO_DIRECT_DATABASE_URL !== undefined) {
+    context.addIssue({ code: "custom", path: ["METRO_DIRECT_DATABASE_URL"], message: "Restricted runtime must not receive operator credentials." });
+  }
+  if (value.METRO_WEBSITE_FOUNDATION_ENABLED === "true" && value.METRO_DATABASE_RUNTIME_ROLE !== "metro_runtime") {
+    context.addIssue({ code: "custom", path: ["METRO_DATABASE_RUNTIME_ROLE"], message: "Website foundation requires the restricted runtime role." });
+  }
   let url: URL;
   try { url = new URL(value.BETTER_AUTH_URL); } catch { return; }
   if (url.protocol !== "https:" && (value.NODE_ENV === "production" || !isLoopbackHost(url.hostname))) {
@@ -72,6 +81,8 @@ export type EnabledAuthEnvironment = {
   secret: string;
   origin: string;
   trustedIpHeader?: "x-real-ip" | "cf-connecting-ip";
+  runtimeRole?: "neondb_owner" | "metro_runtime";
+  foundationEnabled?: boolean;
 };
 
 export type AuthEnvironment = EnabledAuthEnvironment | {
@@ -94,6 +105,8 @@ export function parseServerEnvironment(source: EnvironmentSource): AuthEnvironme
     secret: result.data.BETTER_AUTH_SECRET,
     origin: new URL(result.data.BETTER_AUTH_URL).origin,
     trustedIpHeader: result.data.METRO_AUTH_TRUSTED_IP_HEADER,
+    runtimeRole: result.data.METRO_DATABASE_RUNTIME_ROLE,
+    foundationEnabled: result.data.METRO_WEBSITE_FOUNDATION_ENABLED === "true",
   };
 }
 
@@ -104,6 +117,8 @@ export function readServerEnvironment(): AuthEnvironment {
     METRO_AUTH_ENABLED: process.env.METRO_AUTH_ENABLED,
     METRO_DATABASE_URL: process.env.METRO_DATABASE_URL,
     METRO_DIRECT_DATABASE_URL: process.env.METRO_DIRECT_DATABASE_URL,
+    METRO_DATABASE_RUNTIME_ROLE: process.env.METRO_DATABASE_RUNTIME_ROLE,
+    METRO_WEBSITE_FOUNDATION_ENABLED: process.env.METRO_WEBSITE_FOUNDATION_ENABLED,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     METRO_AUTH_TRUSTED_IP_HEADER: process.env.METRO_AUTH_TRUSTED_IP_HEADER,

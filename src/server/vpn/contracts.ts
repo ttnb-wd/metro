@@ -6,6 +6,8 @@ export const WEBSITE_ISSUER = "metro-website" as const;
 export const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
 export const integer = z.string().regex(/^(0|[1-9][0-9]{0,29})$/);
 const positiveInteger = integer.refine(value => BigInt(value) > BigInt(0));
+export const bytes = integer.refine(value => BigInt(value) <= BigInt(Number.MAX_SAFE_INTEGER));
+const positiveBytes = bytes.refine(value => BigInt(value) > BigInt(0));
 export const instant = z.iso.datetime();
 export const ownerSchema = z.strictObject({ issuer: z.literal(WEBSITE_ISSUER), subject: id });
 export type Owner = z.infer<typeof ownerSchema>;
@@ -19,14 +21,14 @@ export const replacementStates = ["REQUESTED", "FAILURE_VERIFIED", "NEW_KEY_BLOC
 
 export const packageSchema = z.strictObject({
   id, name: z.string().min(1).max(100), monthlyPriceMmk: positiveInteger,
-  monthlyQuotaBytes: positiveInteger, baseDurationDays: z.literal(30),
+  monthlyQuotaBytes: positiveBytes, baseDurationDays: z.literal(30),
 });
 export const quoteSchema = z.strictObject({
   id, owner: ownerSchema, packageId: id, catalogVersion: id, pricingPolicy: z.literal("website-30d-v1"),
   months: z.number().int().min(1).max(12), durationDays: z.number().int().min(30).max(360),
-  monthlyPriceMmk: positiveInteger, monthlyQuotaBytes: positiveInteger,
+  monthlyPriceMmk: positiveInteger, monthlyQuotaBytes: positiveBytes,
   regularMmk: positiveInteger, discountPercent: z.number().int().min(0).max(55),
-  savedMmk: integer, totalMmk: positiveInteger, quotaBytes: positiveInteger, validUntil: instant,
+  savedMmk: integer, totalMmk: positiveInteger, quotaBytes: positiveBytes, validUntil: instant,
 }).superRefine((q, ctx) => {
   const regular = BigInt(q.monthlyPriceMmk) * BigInt(q.months);
   const discount = (q.months - 1) * 5;
@@ -44,7 +46,7 @@ export const entitlementSchema = z.strictObject({
   id, owner: ownerSchema, packageId: id, version: z.number().int().nonnegative(),
   status: z.enum(["ACTIVE", "EXPIRED", "QUOTA_EXHAUSTED", "REVOKED", "PENDING"]),
   keyId: id.nullable(), keyStatus: z.enum(["UNAVAILABLE", "BLOCKED", "ENFORCED", "REPLACEMENT_PENDING"]),
-  expiresAt: instant, totalBytes: positiveInteger, usedBytes: integer, remainingBytes: integer,
+  expiresAt: instant, totalBytes: positiveBytes, usedBytes: bytes, remainingBytes: bytes,
   usageHistoryVersion: z.number().int().nonnegative(), observedAt: instant.nullable(),
 }).superRefine((value, ctx) => {
   const remaining = BigInt(value.totalBytes) - BigInt(value.usedBytes);
@@ -60,6 +62,10 @@ export const orderSchema = z.strictObject({
 export const issueSchema = z.strictObject({
   id, owner: ownerSchema, entitlementId: id, state: z.enum(issueStates),
   attempts: z.number().int().min(0).max(3), createdAt: instant,
+  history: z.array(z.strictObject({
+    kind: z.enum(["REPORTED", "ADMIN_TEST_SUCCEEDED", "ADMIN_TEST_FAILED", "CUSTOMER_RETRY_SUCCEEDED", "CUSTOMER_RETRY_FAILED"]),
+    at: instant, attempt: z.number().int().min(0).max(3),
+  })).min(1).max(100),
 });
 export const diagnosticsSchema = z.strictObject({
   owner: ownerSchema, entitlement: entitlementSchema,
@@ -72,10 +78,20 @@ export const diagnosticsSchema = z.strictObject({
   }
 });
 
+// Durable outbox event contract only; no notification channel is activated.
+export const adminNotificationSchema = z.strictObject({
+  version: z.literal(API_VERSION), eventId: z.uuid(), owner: ownerSchema,
+  audience: z.literal("website-admin"), topic: z.literal("vpn.issue.reported"), issueId: id, occurredAt: instant,
+});
+
 // This value cannot accidentally be serialized into a public DTO or inspected in logs.
 export class SensitiveCredential {
   #value: string;
-  constructor(value: string) { this.#value = z.string().regex(/^ss:\/\/\S+$/).max(4096).parse(value); }
+  constructor(value: string) {
+    const parsed = z.string().regex(/^ss:\/\/\S+$/).max(4096).safeParse(value);
+    if (!parsed.success) throw new Error("Invalid native credential.");
+    this.#value = parsed.data;
+  }
   revealForAuthorizedDelivery(): string { return this.#value; }
   toJSON(): never { throw new Error("Credential serialization forbidden."); }
   toString(): string { return "[REDACTED VPN CREDENTIAL]"; }
@@ -83,7 +99,7 @@ export class SensitiveCredential {
 }
 
 const target = { owner: ownerSchema, entitlementId: id };
-const operationResult = z.strictObject({ owner: ownerSchema, operationId: id, state: z.enum(provisioningStates) });
+const operationResult = z.strictObject({ owner: ownerSchema, orderId: id, operationId: id, state: z.enum(provisioningStates) });
 const reason = z.enum(["CUSTOMER_REPORTED_FAILURE", "ADMIN_CONNECTION_TEST", "VERIFIED_KEY_FAILURE"]);
 
 // All contracts are internal, server-only wire contracts. No public HTTP handlers are registered.
@@ -98,8 +114,8 @@ export const contracts = {
   "issues.retry": { mutation: true, permission: null, request: z.strictObject({ issueId: id, expectedAttempt: z.number().int().min(0).max(2), result: z.enum(["SUCCEEDED", "FAILED"]) }), response: issueSchema },
   "diagnostics.get": { mutation: false, permission: "vpn:diagnostics:read", request: z.strictObject(target), response: diagnosticsSchema },
   "diagnostics.record": { mutation: true, permission: "vpn:diagnostics:write", request: z.strictObject({ ...target, issueId: id, result: z.enum(["SUCCEEDED", "FAILED"]), expectedVersion: z.number().int().nonnegative() }), response: issueSchema },
-  "credentials.reveal": { mutation: true, permission: "vpn:credential:reveal", request: z.strictObject({ ...target, issueId: id, reason }), response: z.strictObject({ owner: ownerSchema, keyId: id, credential: z.string().regex(/^ss:\/\/\S+$/).max(4096).transform(value => new SensitiveCredential(value)) }) },
-  "replacements.request": { mutation: true, permission: "vpn:replacement:request", request: z.strictObject({ ...target, issueId: id, expectedVersion: z.number().int().nonnegative(), reason: z.literal("VERIFIED_KEY_FAILURE") }), response: z.strictObject({ owner: ownerSchema, operationId: id, state: z.enum(replacementStates) }) },
+  "credentials.reveal": { mutation: true, permission: "vpn:credential:reveal", request: z.strictObject({ ...target, issueId: id, expectedVersion: z.number().int().nonnegative(), reason }), response: z.strictObject({ owner: ownerSchema, entitlementId: id, version: z.number().int().nonnegative(), keyId: id, credential: z.string().regex(/^ss:\/\/\S+$/).max(4096).transform(value => new SensitiveCredential(value)) }) },
+  "replacements.request": { mutation: true, permission: "vpn:replacement:request", request: z.strictObject({ ...target, issueId: id, expectedVersion: z.number().int().nonnegative(), reason: z.literal("VERIFIED_KEY_FAILURE") }), response: z.strictObject({ owner: ownerSchema, entitlementId: id, issueId: id, expectedVersion: z.number().int().nonnegative(), operationId: id, state: z.enum(replacementStates) }) },
 } as const;
 
 export type Operation = keyof typeof contracts;

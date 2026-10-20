@@ -1,5 +1,5 @@
 import "server-only";
-import { quoteSchema, packageSchema, entitlementSchema, type Entitlement, type Owner } from "./contracts";
+import { quoteSchema, packageSchema, entitlementSchema, bytes, type Entitlement, type Owner } from "./contracts";
 import { sameOwner } from "./identity";
 
 export function priceQuote(input: { id: string; owner: Owner; pkg: unknown; catalogVersion: string; months: number; validUntil: string }) {
@@ -23,10 +23,12 @@ export function renewalTarget(current: Entitlement, purchasedBytes: string, mont
   if (!/^[1-9][0-9]{0,29}$/.test(purchasedBytes) || !Number.isInteger(months) || months < 1 || months > 12) throw new Error("Invalid renewal.");
   const timestamp = Date.parse(now);
   if (!Number.isFinite(timestamp)) throw new Error("Invalid timestamp.");
-  const total = BigInt(current.totalBytes) + BigInt(purchasedBytes);
   const used = BigInt(current.usedBytes);
+  const remaining = BigInt(current.remainingBytes) + BigInt(purchasedBytes);
+  const total = used + remaining;
+  bytes.parse(String(total));
   return { totalBytes: String(total), usedBytes: current.usedBytes,
-    remainingBytes: String(total > used ? total - used : BigInt(0)),
+    remainingBytes: String(remaining),
     expiresAt: new Date(Math.max(timestamp, Date.parse(current.expiresAt)) + months * 30 * 86400000).toISOString() };
 }
 

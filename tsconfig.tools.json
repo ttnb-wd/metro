@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "incremental": false
+  },
+  "include": ["scripts/**/*.mts", "scripts/**/*.ts", "scripts/**/*.mjs"],
+  "exclude": ["node_modules", "tests", ".tmp"]
+}

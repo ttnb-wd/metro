@@ -3,10 +3,12 @@ import type { BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import type { PrismaClient } from "@/server/db/generated/client";
 import type { EnabledAuthEnvironment } from "@/server/env";
+import { sendVerificationEmail, VERIFICATION_LIFETIME_SECONDS } from "@/server/email/verification";
 
 export const INTERNAL_AUTH_IP_HEADER = "x-metro-auth-ip";
 
-export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: PrismaClient) {
+export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: PrismaClient,
+  deliverVerification: typeof sendVerificationEmail = sendVerificationEmail) {
   const secure = environment.origin.startsWith("https://");
   return {
     appName: "Metro",
@@ -21,7 +23,17 @@ export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: P
       autoSignIn: false,
       minPasswordLength: 12,
       maxPasswordLength: 128,
+      requireEmailVerification: true,
       // No custom password implementation: retain Better Auth's salted scrypt.
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: false,
+      expiresIn: VERIFICATION_LIFETIME_SECONDS,
+      sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+        await deliverVerification({ email: user.email, url, origin: environment.origin });
+      },
     },
     account: { accountLinking: { enabled: false } },
     session: {
@@ -39,10 +51,13 @@ export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: P
         "/sign-in/email": { window: 60, max: 5 },
         "/sign-up/email": { window: 60, max: 3 },
         "/change-password": { window: 60, max: 5 },
+        "/send-verification-email": { window: 60, max: 1 },
+        "/verify-email": { window: 60, max: 10 },
+        "/update-user": { window: 60, max: 5 },
       },
     },
-    // Email delivery and account recovery are not part of this foundation.
-    disabledPaths: ["/request-password-reset", "/reset-password", "/send-verification-email", "/verify-email"],
+    // Account recovery remains outside this step.
+    disabledPaths: ["/request-password-reset", "/reset-password"],
     advanced: {
       cookiePrefix: "metro",
       useSecureCookies: secure,

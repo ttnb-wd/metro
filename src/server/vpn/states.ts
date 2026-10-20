@@ -63,15 +63,18 @@ export function assertTransition<M extends Machine>(machine: M, from: State<M>, 
 }
 
 type Issue = z.infer<typeof issueSchema>;
-export function recordConnectionTest(issue: Issue, result: "SUCCEEDED" | "FAILED"): Issue {
+export function recordConnectionTest(issue: Issue, result: "SUCCEEDED" | "FAILED", at: string): Issue {
   issueSchema.parse(issue);
   const state = result === "SUCCEEDED" ? "TROUBLESHOOTING" : "REPLACEMENT_APPROVED";
   assertTransition("issue", issue.state, state, { failureVerified: result === "FAILED" });
-  return { ...issue, state };
+  return issueSchema.parse({ ...issue, state, history: [...issue.history,
+    { kind: result === "SUCCEEDED" ? "ADMIN_TEST_SUCCEEDED" : "ADMIN_TEST_FAILED", at, attempt: issue.attempts }] });
 }
-export function recordCustomerRetry(issue: Issue, expectedAttempt: number, result: "SUCCEEDED" | "FAILED"): Issue {
+export function recordCustomerRetry(issue: Issue, expectedAttempt: number, result: "SUCCEEDED" | "FAILED", at: string): Issue {
   issueSchema.parse(issue);
   if (issue.state !== "TROUBLESHOOTING" || issue.attempts >= 3 || expectedAttempt !== issue.attempts) throw new Error("Retry is unavailable.");
   const attempts = issue.attempts + 1;
-  return { ...issue, attempts, state: result === "SUCCEEDED" ? "RESOLVED" : attempts === 3 ? "REVIEW_REQUIRED" : "TROUBLESHOOTING" };
+  return issueSchema.parse({ ...issue, attempts,
+    state: result === "SUCCEEDED" ? "RESOLVED" : attempts === 3 ? "REVIEW_REQUIRED" : "TROUBLESHOOTING",
+    history: [...issue.history, { kind: result === "SUCCEEDED" ? "CUSTOMER_RETRY_SUCCEEDED" : "CUSTOMER_RETRY_FAILED", at, attempt: attempts }] });
 }

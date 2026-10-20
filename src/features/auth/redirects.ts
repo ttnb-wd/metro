@@ -11,10 +11,11 @@ export function safeReturnPath(value: unknown): string {
 export function isSafeAuthCallback(value: unknown, origin: string): boolean {
   if (typeof value !== "string" || value.includes("\\") || value.includes("%")
     || [...value].some(character => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127)) return false;
-  if (value.startsWith("/")) return returnPaths.has(value);
+  const callbacks = new Set([...returnPaths, "/verify-email"]);
+  if (value.startsWith("/")) return callbacks.has(value);
   try {
     const url = new URL(value);
     return url.origin === origin && !url.username && !url.password && !url.search && !url.hash
-      && returnPaths.has(url.pathname) && value === `${origin}${url.pathname}`;
+      && callbacks.has(url.pathname) && value === `${origin}${url.pathname}`;
   } catch { return false; }
 }

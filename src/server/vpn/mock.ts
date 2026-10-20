@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { contracts, entitlementSchema, orderSchema, issueSchema, quoteSchema, type Operation, type Owner, type Entitlement, type Quote } from "./contracts";
+import { API_VERSION, contracts, entitlementSchema, orderSchema, issueSchema, type Operation, type Owner, type Entitlement, type Quote } from "./contracts";
 import { type MockVpnTransport, type TransportContext } from "./client";
 import { sameOwner } from "./identity";
 import { priceQuote } from "./policy";
@@ -18,6 +18,8 @@ export function createMockVpnTransport(fixture: Fixture): MockVpnTransport {
   const entitlements = (fixture.entitlements ?? []).map(item => structuredClone(entitlementSchema.parse(item)));
   const quotes = new Map<string, Quote>(); const orders = new Map<string, Order>(); const issues = new Map<string, Issue>();
   const operations = new Map<string, unknown>();
+  const confirmedByOrder = new Map<string, string>();
+  const replacementIssues = new Map<string, string>();
   const requests = new Map<string, { digest: string; result: Promise<unknown> }>();
   let sequence = 0;
   const nextId = () => `fixture-${++sequence}`;
@@ -54,33 +56,41 @@ export function createMockVpnTransport(fixture: Fixture): MockVpnTransport {
       case "payments.confirm": {
         const p = contracts[operation].request.parse(input); const order = owned(orders.get(p.orderId), context);
         if (order.totalMmk !== p.amountMmk) return fail("CONFLICT", context);
-        const prior = operations.get(`order:${order.id}`); if (prior) return prior;
+        const prior = operations.get(`order:${order.id}`);
+        if (prior) {
+          if (confirmedByOrder.get(order.id) !== p.verificationId) return fail("CONFLICT", context);
+          return prior;
+        }
         if (operations.has(`verification:${p.verificationId}`)) return fail("CONFLICT", context);
         // Mock authority is supplied by the client authorization dependency, never form fields.
         assertTransition("payment", order.payment, "UNDER_REVIEW");
         assertTransition("payment", "UNDER_REVIEW", "CONFIRMED", { paymentAuthorityVerified: true, verificationId: p.verificationId });
         assertTransition("provisioning", order.provisioning, "QUEUED", { payment: "CONFIRMED" });
         assertTransition("order", order.state, "FULFILMENT_PENDING", { payment: "CONFIRMED" });
-        const result = { owner: context.owner, operationId: nextId(), state: "QUEUED" };
+        const result = { owner: context.owner, orderId: order.id, operationId: nextId(), state: "QUEUED" };
         order.payment = "CONFIRMED"; order.provisioning = "QUEUED"; order.state = "FULFILMENT_PENDING";
         operations.set(`order:${order.id}`, result); operations.set(`verification:${p.verificationId}`, order.id);
+        confirmedByOrder.set(order.id, p.verificationId);
         return result;
       }
       case "issues.report": {
         const p = contracts[operation].request.parse(input);
         owned(entitlements.find(e => e.id === p.entitlementId), context);
         const issue = issueSchema.parse({ id: nextId(), owner: context.owner, entitlementId: p.entitlementId,
-          state: "OPEN", attempts: 0, createdAt: fixture.now() });
+          state: "OPEN", attempts: 0, createdAt: fixture.now(), history: [{ kind: "REPORTED", at: fixture.now(), attempt: 0 }] });
         issues.set(issue.id, issue); return issue;
       }
       case "issues.retry": {
         const p = contracts[operation].request.parse(input); const issue = owned(issues.get(p.issueId), context);
-        try { const updated = recordCustomerRetry(issue, p.expectedAttempt, p.result); issues.set(issue.id, updated); return updated; }
+        try { const updated = recordCustomerRetry(issue, p.expectedAttempt, p.result, fixture.now()); issues.set(issue.id, updated); return updated; }
         catch { return fail("CONFLICT", context); }
       }
       case "diagnostics.get": {
         const p = contracts[operation].request.parse(input); const entitlement = owned(entitlements.find(e => e.id === p.entitlementId), context);
-        return { owner: context.owner, identity: context.owner, entitlement, issues: [...issues.values()].filter(issue => sameOwner(issue.owner, context.owner) && issue.entitlementId === entitlement.id), connectionTest: "NOT_TESTED" };
+        const history = [...issues.values()].filter(issue => sameOwner(issue.owner, context.owner) && issue.entitlementId === entitlement.id);
+        const lastTest = history.flatMap(issue => issue.history).filter(event => event.kind.startsWith("ADMIN_TEST_")).at(-1);
+        return { owner: context.owner, identity: context.owner, entitlement, issues: history,
+          connectionTest: lastTest ? lastTest.kind === "ADMIN_TEST_SUCCEEDED" ? "SUCCEEDED" : "FAILED" : "NOT_TESTED" };
       }
       case "diagnostics.record": {
         const p = contracts[operation].request.parse(input); const entitlement = owned(entitlements.find(e => e.id === p.entitlementId), context);
@@ -88,23 +98,30 @@ export function createMockVpnTransport(fixture: Fixture): MockVpnTransport {
         if (issue.entitlementId !== entitlement.id || entitlement.version !== p.expectedVersion) return fail("CONFLICT", context);
         if (issue.state !== "OPEN") return fail("CONFLICT", context);
         assertTransition("issue", "OPEN", "DIAGNOSING");
-        const updated = recordConnectionTest({ ...issue, state: "DIAGNOSING" }, p.result);
+        const updated = recordConnectionTest({ ...issue, state: "DIAGNOSING" }, p.result, fixture.now());
         issues.set(issue.id, updated); return updated;
       }
       case "replacements.request": {
         const p = contracts[operation].request.parse(input); const entitlement = owned(entitlements.find(e => e.id === p.entitlementId), context);
         const issue = owned(issues.get(p.issueId), context);
-        const prior = operations.get(`replacement:${entitlement.id}:${p.expectedVersion}`); if (prior) return prior;
-        if (issue.entitlementId !== entitlement.id || issue.state !== "REPLACEMENT_APPROVED" || entitlement.version !== p.expectedVersion ||
+        const operationKey = `replacement:${entitlement.id}:${p.expectedVersion}`;
+        if (issue.entitlementId !== entitlement.id) return fail("CONFLICT", context);
+        const prior = operations.get(operationKey);
+        if (prior) {
+          if (replacementIssues.get(operationKey) !== issue.id) return fail("CONFLICT", context);
+          return prior;
+        }
+        if (issue.state !== "REPLACEMENT_APPROVED" || entitlement.version !== p.expectedVersion ||
             entitlement.status !== "ACTIVE" || !entitlement.keyId || BigInt(entitlement.remainingBytes) <= BigInt(0) ||
             Date.parse(entitlement.expiresAt) <= Date.parse(fixture.now())) return fail("CONFLICT", context);
-        const result = { owner: context.owner, operationId: nextId(), state: "REQUESTED" };
-        operations.set(`replacement:${entitlement.id}:${p.expectedVersion}`, result); return result;
+        const result = { owner: context.owner, entitlementId: entitlement.id, issueId: issue.id, expectedVersion: p.expectedVersion, operationId: nextId(), state: "REQUESTED" };
+        operations.set(operationKey, result); replacementIssues.set(operationKey, issue.id); return result;
       }
       case "credentials.reveal": return fail("UNAVAILABLE", context); // Never mint even a simulated credential.
     }
   }
   return { mode: "mock", async execute(operation, input, context) {
+    if (context.version !== API_VERSION) return fail("INVALID_REQUEST", context);
     const parsed = contracts[operation].request.parse(input);
     // Mock operation snapshots cannot be mutated by a caller after returning.
     if (!contracts[operation].mutation) return structuredClone(await run(operation, parsed, context));

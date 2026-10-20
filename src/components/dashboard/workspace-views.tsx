@@ -4,6 +4,7 @@ import { services } from "@/config/services";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { LogoutButton } from "@/components/forms/logout-button";
+import { ProfileNameForm } from "@/components/forms/profile-name-form";
 import { PageHeading, SectionHeader, EmptyState, QuickActionCard, ServiceOverviewCard, WorkspaceNote } from "@/components/dashboard/workspace-components";
 
 export function OverviewView({ name }: { name: string }) {
@@ -65,7 +66,7 @@ export function SettingsView({ account }: { account: { name: string; email: stri
     <PageHeading eyebrow="YOUR ACCOUNT" title="Settings" description="The details that make this space yours. Manage your appearance and your current session." />
     <section className="workspace-panel"><SectionHeader title="Account details" description="Your authenticated Metro website identity." /><dl className="workspace-account-details">
       <div><dt>Name</dt><dd>{account.name}</dd></div><div><dt>Email address</dt><dd>{account.email}</dd></div><div><dt>Sign-in method</dt><dd>Email & password</dd></div><div><dt>Member since</dt><dd><time dateTime={joined.toISOString()}>{joinedLabel}</time></dd></div>
-    </dl><p className="workspace-panel-footnote">Profile, email and password changes are not available yet.</p></section>
+    </dl><ProfileNameForm name={account.name} /><p className="workspace-panel-footnote">Email and password changes are not available yet.</p></section>
     <section className="workspace-panel workspace-section"><div className="workspace-settings-row"><div><h2>Appearance</h2><p>Light or dark. Make Metro comfortable for you on this browser.</p></div><ThemeToggle /></div></section>
     <section className="workspace-panel workspace-section"><div className="workspace-settings-row"><div><h2>Your session</h2><p>End your current session on this browser when you’re finished.</p></div><LogoutButton /></div></section>
   </>;

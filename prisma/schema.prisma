@@ -18,6 +18,18 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  // BEGIN website foundation back-relations (no authentication columns change)
+  ownerBinding  OwnerBinding?
+  websiteOrders WebsiteOrder[]
+  services      WebsiteServiceReference[]
+  auditActor    WebsiteAuditEvent[] @relation("AuditActor")
+  auditTarget   WebsiteAuditEvent[] @relation("AuditTarget")
+  decisions     PaymentDecision[]
+  issueEvents   SupportIssueEvent[]
+  requests      WebsiteRequest[] @relation("RequestActor")
+  requestTargets WebsiteRequest[] @relation("RequestTarget")
+  outboxEvents  WebsiteOutboxEvent[]
+  // END website foundation back-relations
 
   @@map("metro_user")
 }
@@ -82,4 +94,198 @@ model RateLimit {
 
   @@index([lastRequest])
   @@map("metro_rate_limit")
+}
+
+// BEGIN Step 06B.2 additive website foundation
+model OwnerBinding {
+  slot       Int      @id @default(1)
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  assignedAt DateTime @default(now())
+  @@map("metro_owner_binding")
+}
+
+model WebsiteOrder {
+  id            String @id @default(uuid())
+  userId        String
+  user          User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  quoteId       String @unique
+  quoteSnapshot Json
+  totalMmk      Decimal @db.Decimal(30, 0)
+  currency      String @default("MMK")
+  state         String @default("AWAITING_PAYMENT")
+  payment       String @default("UNVERIFIED")
+  provisioning  String @default("NOT_REQUESTED")
+  version       Int @default(0)
+  createdAt     DateTime @default(now())
+  evidence      PaymentEvidence[]
+  decisions     PaymentDecision[]
+  operations    WebsiteOperation[]
+  @@unique([id, userId])
+  @@index([userId, createdAt])
+  @@map("metro_website_order")
+}
+
+model PaymentEvidence {
+  id         String @id @default(uuid())
+  orderId    String
+  userId     String
+  order      WebsiteOrder @relation(fields: [orderId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  storageRef String @unique
+  sha256     String @db.Char(64)
+  mediaType  String
+  bytes      Int
+  createdAt  DateTime @default(now())
+  decisions  PaymentDecision[]
+  @@unique([id, orderId, userId])
+  @@index([userId, orderId])
+  @@map("metro_payment_evidence")
+}
+
+model PaymentDecision {
+  id              String @id @default(uuid())
+  orderId         String
+  userId          String
+  order           WebsiteOrder @relation(fields: [orderId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  evidenceId      String
+  evidence        PaymentEvidence @relation(fields: [evidenceId, orderId, userId], references: [id, orderId, userId], onDelete: Restrict, onUpdate: Restrict)
+  decision        String
+  verificationRef String @unique
+  amountMmk       Decimal @db.Decimal(30, 0)
+  ownerId         String
+  owner           User @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reasonCode      String
+  createdAt       DateTime @default(now())
+  @@index([userId, orderId])
+  @@map("metro_payment_decision")
+}
+
+// Projection only. The existing VPN engine remains entitlement authority.
+model WebsiteServiceReference {
+  id            String @id @default(uuid())
+  userId        String
+  user          User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  externalId    String @unique
+  snapshot      Json
+  version       Int
+  capturedAt    DateTime @default(now())
+  issues        SupportIssue[]
+  operations    WebsiteOperation[]
+  @@unique([id, userId])
+  @@index([userId])
+  @@map("metro_service_reference")
+}
+
+model SupportIssue {
+  id          String @id @default(uuid())
+  serviceId   String
+  userId      String
+  service     WebsiteServiceReference @relation(fields: [serviceId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  category    String
+  description String @db.VarChar(1000)
+  state       String @default("OPEN")
+  attempts    Int @default(0)
+  version     Int @default(0)
+  createdAt   DateTime @default(now())
+  events      SupportIssueEvent[]
+  operations  WebsiteOperation[]
+  @@unique([id, userId])
+  @@unique([id, serviceId, userId])
+  @@index([userId, createdAt])
+  @@map("metro_support_issue")
+}
+
+model SupportIssueEvent {
+  id        String @id @default(uuid())
+  issueId   String
+  userId    String
+  issue     SupportIssue @relation(fields: [issueId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  actorId   String
+  actor     User @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  kind      String
+  attempt   Int
+  version   Int
+  createdAt DateTime @default(now())
+  @@unique([issueId, version])
+  @@index([userId, issueId])
+  @@map("metro_issue_event")
+}
+
+model WebsiteAuditEvent {
+  id             String @id @default(uuid())
+  actorId        String
+  actor          User @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  targetUserId   String
+  target         User @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  action         String
+  outcome        String
+  resourceId     String
+  reasonCode     String
+  requestId      String
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+  @@index([targetUserId, createdAt])
+  @@map("metro_owner_audit")
+}
+
+model WebsiteRequest {
+  id         String @id @default(uuid())
+  actorId    String
+  actor      User @relation("RequestActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  userId     String
+  target     User @relation("RequestTarget", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  action     String
+  key        String
+  digest     String @db.Char(64)
+  state      String @default("RUNNING")
+  resultId   String?
+  createdAt  DateTime @default(now())
+  @@unique([actorId, action, key])
+  @@index([userId])
+  @@map("metro_website_request")
+}
+
+model WebsiteOperation {
+  id              String @id @default(uuid())
+  userId          String
+  kind            String
+  resourceKey     String
+  orderId         String?
+  order           WebsiteOrder? @relation(fields: [orderId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  serviceId       String?
+  service         WebsiteServiceReference? @relation(fields: [serviceId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  issueId         String?
+  issue           SupportIssue? @relation(fields: [issueId, serviceId, userId], references: [id, serviceId, userId], onDelete: Restrict, onUpdate: Restrict)
+  expectedVersion Int?
+  frozenSnapshot  Json
+  state           String @default("QUEUED")
+  version         Int @default(0)
+  candidateKeyId  String? @unique(map: "metro_candidate_key_unique")
+  createdAt       DateTime @default(now())
+  outbox          WebsiteOutboxEvent[]
+  @@unique([kind, resourceKey])
+  @@unique([id, userId])
+  @@index([userId])
+  @@map("metro_website_operation")
+}
+
+model WebsiteOutboxEvent {
+  id          String @id @default(uuid())
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "metro_outbox_user_fkey")
+  operationId String?
+  operation   WebsiteOperation? @relation(fields: [operationId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  topic       String
+  businessKey String @unique
+  resourceId  String
+  state       String @default("PENDING")
+  version     Int @default(0)
+  attempts    Int @default(0)
+  leaseId     String?
+  leaseUntil  DateTime?
+  availableAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([state, availableAt])
+  @@map("metro_website_outbox")
 }
