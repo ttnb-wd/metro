@@ -10,7 +10,7 @@ export function ServiceCard({ detailed = false, service = secureAccess, headingL
       <div className="flex items-center justify-between gap-3"><span className="eyebrow text-muted-foreground">CURRENT SERVICE</span><span className="service-tag">{service.category}</span></div>
       <div className="service-title"><span className="service-icon"><ShieldCheck size={25} strokeWidth={1.5} aria-hidden="true" /></span><Heading>{service.name}</Heading></div>
       <p className="service-description">{service.description}</p>
-      {detailed && <p className="catalog-service-note">Available through Outline Client for desktop and mobile. Website ordering is not yet enabled.</p>}
+      {detailed && <p className="catalog-service-note">Available through Outline Client for desktop and mobile. Choose a plan online and activate after payment review.</p>}
       <div className="service-actions"><Button variant="secondary" asChild><Link href={service.href}>Service details <ArrowUpRight aria-hidden="true" /></Link></Button><Link href={service.plansHref} className="text-link gap-2 text-xs">View plans <ArrowUpRight size={13} aria-hidden="true" /></Link></div>
     </div>
     <div className="service-map" aria-label="Planned customer flow: your account, Secure Access, guided setup">

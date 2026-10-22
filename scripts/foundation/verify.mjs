@@ -1,7 +1,13 @@
-import {readFileSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 export const migrationNames=['20261020000000_init_website_auth','20261020010000_website_owner_foundation'];
 export function migrationChecksums(){return Object.fromEntries(migrationNames.map(name=>[name,createHash('sha256').update(readFileSync(`prisma/migrations/${name}/migration.sql`)).digest('hex')]));}
+
+// A legacy approval must never authorize additional migrations added later.
+export function assertReviewedMigrationSet(names = migrationNames) {
+  const actual=readdirSync('prisma/migrations',{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
+  if(JSON.stringify(actual)!==JSON.stringify([...names].sort()))throw new Error('Migration directory contains separately unapproved changes.');
+}
 
 export async function verifyFoundationArtifacts(client){
   const sql=migrationNames.map(name=>readFileSync(`prisma/migrations/${name}/migration.sql`,'utf8')).join('\n');

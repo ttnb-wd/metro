@@ -1,3 +1,4 @@
+import { formatMyanmarTime } from "@/lib/myanmar-time";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { services } from "@/config/services";
@@ -61,7 +62,7 @@ export function BillingView() {
 
 export function SettingsView({ account }: { account: { name: string; email: string; createdAt: Date | string } }) {
   const joined = new Date(account.createdAt);
-  const joinedLabel = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Rangoon" }).format(joined);
+  const joinedLabel = formatMyanmarTime(joined);
   return <>
     <PageHeading eyebrow="YOUR ACCOUNT" title="Settings" description="The details that make this space yours. Manage your appearance and your current session." />
     <section className="workspace-panel"><SectionHeader title="Account details" description="Your authenticated Metro website identity." /><dl className="workspace-account-details">

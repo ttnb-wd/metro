@@ -8,9 +8,9 @@ export function Footer() {
       <div><BrandMark /><p className="mt-3 text-sm text-muted-foreground">Your digital essentials. One place.</p></div>
       <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <Link className="footer-link" href="/services">Services</Link><Link className="footer-link" href="/plans">Plans</Link><Link className="footer-link" href="/login">Log in</Link>
-        <Link className="footer-link" href="/dashboard">Dashboard preview <ArrowUpRight size={14} aria-hidden="true" /></Link>
+        <Link className="footer-link" href="/dashboard">My account <ArrowUpRight size={14} aria-hidden="true" /></Link>
       </nav>
     </div>
-    <div className="footer-bottom"><span>© {new Date().getFullYear()} Metro</span><span>Website preview · Accounts and purchases are not yet available.</span></div>
+    <div className="footer-bottom"><span>© {new Date().getFullYear()} Metro</span><span>Digital services, connected.</span></div>
   </footer>;
 }

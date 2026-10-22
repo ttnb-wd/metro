@@ -18,7 +18,7 @@ export class ChannelBindingClient extends Client {
 }
 
 // Call only with a URL accepted by the server environment validator.
-export function createPgPoolConfig(databaseUrl: string): PoolConfig {
+export function createPgPoolConfig(databaseUrl: string, serverless = process.env.VERCEL === "1"): PoolConfig {
   const url = new URL(databaseUrl);
   const tls = !isLoopbackHost(url.hostname) || url.searchParams.get("sslmode") === "verify-full";
   const channelBinding = url.searchParams.get("channel_binding");
@@ -38,8 +38,9 @@ export function createPgPoolConfig(databaseUrl: string): PoolConfig {
       }
     },
     application_name: url.searchParams.get("application_name") ?? "metro_website",
-    max: 5,
+    max: serverless ? 3 : 5,
     connectionTimeoutMillis: 5_000,
-    idleTimeoutMillis: 30_000,
+    idleTimeoutMillis: serverless ? 5_000 : 30_000,
+    ...(serverless ? { allowExitOnIdle: true, maxLifetimeSeconds: 60 } : {}),
   };
 }

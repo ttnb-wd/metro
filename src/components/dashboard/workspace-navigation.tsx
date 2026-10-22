@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, PanelsTopLeft, Shield, ShoppingBag, CreditCard, Settings } from "lucide-react";
+import { LayoutGrid, PanelsTopLeft, Shield, ShoppingBag, CreditCard, Settings, Bell } from "lucide-react";
 import { dashboardNavigation } from "@/config/site";
 import { SheetClose } from "@/components/ui/sheet";
 
-const icons = { overview: PanelsTopLeft, services: LayoutGrid, access: Shield, orders: ShoppingBag, billing: CreditCard, settings: Settings };
+const icons = { overview: PanelsTopLeft, services: LayoutGrid, access: Shield, orders: ShoppingBag, billing: CreditCard, settings: Settings, notifications: Bell };
 
 export function WorkspaceNavigation({ mobile = false, compact = false }: { mobile?: boolean; compact?: boolean }) {
   const pathname = usePathname();

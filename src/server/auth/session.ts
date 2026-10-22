@@ -6,6 +6,7 @@ import { AuthUnavailableError, getAuth, type WebsiteSession } from "@/server/aut
 import { readServerEnvironment } from "@/server/env";
 import { safeReturnPath } from "@/server/auth/redirects";
 import { assertWebsiteDatabaseReady } from "@/server/db/verify-target";
+import { getAccountDestination } from "./account-routing";
 
 // React cache is request-scoped, never a global user/session cache.
 export const getWebsiteSession = cache(async (): Promise<WebsiteSession | null> => {
@@ -23,6 +24,9 @@ export async function requireWebsiteSession(returnTo: unknown = "/dashboard"): P
   if (!readServerEnvironment().enabled) throw new AuthUnavailableError();
   const session = await getWebsiteSession();
   if (!session) redirect(`/login?next=${encodeURIComponent(safeReturnPath(returnTo))}`);
+  const destination = safeReturnPath(returnTo);
+  if ((destination === "/dashboard" || destination.startsWith("/dashboard/"))
+    && await getAccountDestination(session, destination) === "/admin") redirect("/admin");
   return session;
 }
 

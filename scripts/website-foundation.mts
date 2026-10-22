@@ -7,7 +7,7 @@ import { assertWebsiteTargetUrl, WEBSITE_DATABASE, WEBSITE_DIRECT_HOST } from ".
 import { createPgPoolConfig } from "../src/server/db/connection-config.ts";
 import { productionRoles, grantsSql, transferTablesSql, revokeAssignmentSql, authTables, foundationTables, createRestrictedRoles } from "./foundation/roles.mjs";
 import { assignOwner } from "./foundation/assign-owner.mjs";
-import { migrationNames as names, migrationChecksums, verifyFoundationArtifacts } from "./foundation/verify.mjs";
+import { migrationNames as names, migrationChecksums, verifyFoundationArtifacts, assertReviewedMigrationSet } from "./foundation/verify.mjs";
 
 const checksums=migrationChecksums();
 const ownerUuid="d7c44865-3afd-4b86-b23a-fccef97d5b08", ownerEmail="maungshinhtet@gmail.com";
@@ -38,6 +38,7 @@ try {
       approvalRequired:true,backupAndRestoreEvidenceRequired:true,ownerUuid,ownerEmail,displayNameChange:"Authenticated self-service only after separate approval"},null,2));
   }else{
     if(!["roles","migrate","assign-owner","revoke-assignment"].includes(action))throw new Error("Unknown action.");
+    if(action === "migrate") assertReviewedMigrationSet();
     const receipt=JSON.parse(readFileSync(process.argv[3],"utf8"));
     if(receipt.approved!==true||receipt.action!==action||receipt.host!==WEBSITE_DIRECT_HOST||receipt.database!==WEBSITE_DATABASE
       ||receipt.maintenanceApproved!==true||receipt.productionBackupReady!==true||typeof receipt.backupReference!=="string"||!receipt.backupReference.trim()

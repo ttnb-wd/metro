@@ -29,6 +29,8 @@ model User {
   requests      WebsiteRequest[] @relation("RequestActor")
   requestTargets WebsiteRequest[] @relation("RequestTarget")
   outboxEvents  WebsiteOutboxEvent[]
+  pricingReleases WebsitePricingRelease[]
+  notifications WebsiteNotification[]
   // END website foundation back-relations
 
   @@map("metro_user")
@@ -288,4 +290,42 @@ model WebsiteOutboxEvent {
   @@index([userId])
   @@index([state, availableAt])
   @@map("metro_website_outbox")
+}
+
+// Append-only, independently published website catalog. Orders keep their original quoteSnapshot.
+model WebsitePricingRelease {
+  id            String @id @default(uuid())
+  version       Int @unique
+  catalog       Json
+  createdById   String
+  createdBy     User @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestKey    String @unique
+  payloadDigest String @db.Char(64)
+  createdAt     DateTime @default(now())
+  @@map("metro_pricing_release")
+}
+
+// Website-only history and transactional email queue; never stores VPN keys.
+model WebsiteNotification {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  audience String
+  kind String
+  dedupeKey String @unique @db.VarChar(220)
+  payload Json
+  href String @db.VarChar(200)
+  readAt DateTime?
+  emailState String @default("PENDING")
+  emailErrorCode String? @db.VarChar(40)
+  emailSentAt DateTime?
+  emailAttempts Int @default(0)
+  emailLeaseId String?
+  emailLeaseUntil DateTime?
+  emailAvailableAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([emailState, emailAvailableAt])
+  @@map("metro_website_notification")
 }

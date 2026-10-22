@@ -31,7 +31,7 @@ export function AuthForm({ mode, returnTo, registered = false, verified = false 
       password: String(data.get("password") ?? ""), ...(registering ? { callbackURL: "/verify-email" } : { callbackURL: destination, rememberMe: true }),
     });
     if (failure) { setError(failure); setPending(false); return; }
-    router.replace(registering ? `/verify-email?next=${encodeURIComponent(destination)}` : destination);
+    router.replace(registering ? `/verify-email?next=${encodeURIComponent(destination)}` : `/account?next=${encodeURIComponent(destination)}`);
     router.refresh();
   }
 

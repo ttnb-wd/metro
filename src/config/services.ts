@@ -12,7 +12,7 @@ export const secureAccess: ServiceDefinition = {
   id: "secure-access",
   name: "Secure Access",
   category: "VPN",
-  description: "VPN access through Outline Client, with data packages and flexible durations. Website ordering and guided setup are coming later.",
+  description: "VPN access through Outline Client, with data packages and flexible durations. Order online, submit payment proof and manage your service from your Metro account.",
   href: "/services/secure-access",
   plansHref: "/plans",
   availability: "available",

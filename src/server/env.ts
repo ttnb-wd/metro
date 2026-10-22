@@ -97,6 +97,13 @@ export function parseServerEnvironment(source: EnvironmentSource): AuthEnvironme
   if (gate.data.METRO_AUTH_ENABLED === "false") return { enabled: false, nodeEnv: gate.data.NODE_ENV };
   const result = enabledSchema.safeParse(source);
   if (!result.success) throw new EnvironmentConfigurationError(result.error.issues.map(issue => String(issue.path[0])));
+  if (source.VERCEL === "1") {
+    const forbidden = ["METRO_DIRECT_DATABASE_URL", "METRO_COMMERCE_WORKER_DATABASE_URL", "METRO_NOTIFICATION_WORKER_DATABASE_URL"].filter(key => source[key]);
+    if (result.data.METRO_DATABASE_RUNTIME_ROLE !== "metro_runtime") forbidden.push("METRO_DATABASE_RUNTIME_ROLE");
+    const target = new URL(result.data.METRO_DATABASE_URL);
+    if (!target.hostname.endsWith(".neon.tech") || !target.hostname.includes("-pooler.") || decodeURIComponent(target.username) !== "metro_runtime") forbidden.push("METRO_DATABASE_URL");
+    if (forbidden.length) throw new EnvironmentConfigurationError(forbidden);
+  }
   return {
     enabled: true,
     nodeEnv: result.data.NODE_ENV,
@@ -114,6 +121,7 @@ export function readServerEnvironment(): AuthEnvironment {
   // No DATABASE_URL, Aiven, Telegram, NEXT_PUBLIC_*, or host-header fallback.
   return parseServerEnvironment({
     NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
     METRO_AUTH_ENABLED: process.env.METRO_AUTH_ENABLED,
     METRO_DATABASE_URL: process.env.METRO_DATABASE_URL,
     METRO_DIRECT_DATABASE_URL: process.env.METRO_DIRECT_DATABASE_URL,
@@ -122,5 +130,7 @@ export function readServerEnvironment(): AuthEnvironment {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     METRO_AUTH_TRUSTED_IP_HEADER: process.env.METRO_AUTH_TRUSTED_IP_HEADER,
+    METRO_COMMERCE_WORKER_DATABASE_URL: process.env.METRO_COMMERCE_WORKER_DATABASE_URL,
+    METRO_NOTIFICATION_WORKER_DATABASE_URL: process.env.METRO_NOTIFICATION_WORKER_DATABASE_URL,
   });
 }

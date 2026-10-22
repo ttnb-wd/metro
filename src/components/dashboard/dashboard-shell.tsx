@@ -26,7 +26,7 @@ export function DashboardShell({ children, account }: { children: React.ReactNod
       <header className="workspace-topbar">
         <div className="workspace-mobile-brand"><BrandMark className="workspace-brand" /></div>
         <div className="workspace-breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>{current}</strong></div>
-        <div className="workspace-header-actions"><ThemeToggle /><AccountMenu account={account} />
+        <div className="workspace-header-actions"><Link href="/dashboard/notifications" className="workspace-notification-link" aria-label="Open notifications">Alerts</Link><ThemeToggle /><AccountMenu account={account} />
           <div className="workspace-mobile-menu"><Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" aria-label="Open workspace navigation"><Menu size={20} aria-hidden="true" /></Button></SheetTrigger>
             <SheetContent className="workspace-drawer"><SheetTitle className="workspace-drawer-title">Your workspace</SheetTitle><SheetDescription className="workspace-drawer-description">Your services and account, together.</SheetDescription><WorkspaceNavigation mobile /></SheetContent>
           </Sheet></div>

@@ -14,5 +14,6 @@ export const dashboardNavigation = [
   { href: "/dashboard/secure-access", label: "Secure Access", icon: "access" },
   { href: "/dashboard/orders", label: "Orders", icon: "orders" },
   { href: "/dashboard/billing", label: "Billing", icon: "billing" },
+  { href: "/dashboard/notifications", label: "Notifications", icon: "notifications" },
   { href: "/dashboard/settings", label: "Settings", icon: "settings" },
 ] as const;

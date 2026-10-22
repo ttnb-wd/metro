@@ -6,7 +6,7 @@ import { AUTH_TABLES, FOUNDATION_TABLES, WEBSITE_ROLES } from "../db/target-poli
 import { buildRepositories } from "./repositories";
 import { FoundationError, createOwnerAuthorization } from "../owner/authorization";
 
-async function foundationDatabase() {
+export async function foundationDatabase() {
   const environment = readServerEnvironment();
   if (!environment.enabled || !environment.foundationEnabled || environment.runtimeRole !== WEBSITE_ROLES.runtime) throw new FoundationError("DISABLED");
   try {
@@ -22,7 +22,9 @@ async function foundationDatabase() {
         ARRAY(SELECT tablename::text FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'metro_%' ORDER BY tablename)::text[] AS tables,
         EXISTS(SELECT 1 FROM _prisma_migrations WHERE migration_name='20261020010000_website_owner_foundation' AND finished_at IS NOT NULL AND rolled_back_at IS NULL) AS migrated
       FROM pg_roles WHERE rolname=current_user`;
-    if (!state || state.unsafe || !state.migrated || JSON.stringify(state.tables) !== JSON.stringify([...AUTH_TABLES, ...FOUNDATION_TABLES].sort())) throw new Error();
+    const required = [...AUTH_TABLES, ...FOUNDATION_TABLES];
+    const allowed = [...required, "metro_pricing_release", "metro_website_notification"];
+    if (!state || state.unsafe || !state.migrated || required.some(table => !state.tables.includes(table)) || state.tables.some(table => !allowed.includes(table))) throw new Error();
     return db;
   } catch { throw new FoundationError("UNAVAILABLE"); }
 }

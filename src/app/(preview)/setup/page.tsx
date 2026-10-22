@@ -1,16 +1,10 @@
+import { LiveRefresh } from "@/components/commerce/live-refresh";
 import { requireWebsiteSession } from "@/server/auth/session";
-import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageIntro } from "@/components/marketing/page-intro";
-import { PreviewNotice } from "@/components/preview/preview-notice";
-
-export const metadata: Metadata = { title: "Setup preview" };
-const steps = [
-  { title: "Your service details", description: "Your selected service and activation information will appear here. No service is loaded in this preview." },
-  { title: "Instructions for your device", description: "Device-specific guidance will be provided after the service integration is ready. No downloads or connection links are available here." },
-  { title: "Continue to your service", description: "Your dashboard will bring together the next steps. This preview cannot provision access or verify a connection." },
-];
+import Link from "next/link";
+import { CustomerServices } from "@/components/commerce/service-list";
 export default async function SetupPage() {
   await requireWebsiteSession("/setup");
- return <div className="page-container content-page"><PageIntro eyebrow="GETTING STARTED / PREVIEW" title="A place to find your way."><p>A preview of the planned setup journey for Secure Access. These steps are informational and cannot be completed yet.</p></PageIntro><PreviewNotice>No activation, access keys, server connections, or device configuration are available. This page has no connection to a live VPN service.</PreviewNotice><div className="setup-steps">{steps.map((step,i) => <section className="setup-step" key={step.title}><span>0{i+1}</span><div><h2>{step.title}</h2><p>{step.description}</p></div></section>)}</div><Link className="text-link mt-7 gap-2 text-sm" href="/dashboard/secure-access"><ArrowLeft size={15} aria-hidden="true" />Back to service preview</Link></div>; }
+  const platforms = [{ name: "Android", href: "https://play.google.com/store/apps/details?id=org.outline.android.client" }, { name: "iPhone / iPad", href: "https://apps.apple.com/us/app/outline-app/id1356177741" }, { name: "Windows", href: "https://getoutline.org/get-started/#step-3" }, { name: "macOS", href: "https://getoutline.org/get-started/#step-3" }];
+  return <div className="page-container content-page"><PageIntro eyebrow="SECURE ACCESS / SETUP" title="Connect with Outline."><p>Use the official Outline Client and your private native access key.</p></PageIntro><CustomerServices setupOnly /><LiveRefresh /><div className="detail-grid">{platforms.map(platform => <section className="detail-panel" key={platform.name}><h2>{platform.name}</h2><ol className="commerce-steps"><li><a href={platform.href} target="_blank" rel="noopener noreferrer" className="text-link">Install the official Outline Client ↗</a></li><li>Return to Metro → Secure Access and choose Show connection key.</li><li>Choose Open Outline. If import is blocked, copy your key, open Outline, choose Add server and paste it.</li><li>Connect from Outline. Accept your device’s VPN permission prompt if shown.</li></ol></section>)}</div><section className="detail-panel mt-6"><h2>Reconnect reliably</h2><p>Disconnect and reconnect in Outline using the same imported server. Metro supplies a native ss:// key, not a changing configuration link. Ordinary quota renewal keeps the same key when it still exists. A support replacement requires removing the old entry and importing the new key.</p><p>Automatic opening and import depend on the operating system and browser. Metro cannot paste into another app or confirm your device’s connection state.</p><Link href="/dashboard/secure-access" className="text-link">Go to Secure Access →</Link></section></div>;
+}

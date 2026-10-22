@@ -27,21 +27,6 @@
 .workspace-breadcrumb strong { color: var(--foreground); font-weight: 500; }
 .workspace-header-actions { display: flex; align-items: center; gap: 13px; }
 .workspace-header-actions > button:first-child { color: var(--muted-foreground); }
-.workspace-account-trigger { display: inline-flex; align-items: center; gap: 10px; min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 30px; padding: 5px 12px 5px 5px; background: var(--surface); }
-.workspace-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb,var(--primary) 12%,var(--background)); color: var(--foreground); font-size: 10px; font-weight: 600; letter-spacing: .02em; }
-.workspace-account-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.workspace-account-chevron { color: var(--muted-foreground); }
-.workspace-account-menu { z-index: 70; width: min(286px,calc(100vw - 24px)); padding: 7px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--foreground); box-shadow: 0 18px 60px #04122620; animation: workspace-menu-in 130ms ease-out; }
-.workspace-account-label { padding: 13px 12px 15px; overflow-wrap: anywhere; }
-.workspace-account-label > span { color: var(--muted-foreground); font-size: 8px; letter-spacing: .12em; }
-.workspace-account-label strong { display: block; font-family: "Space Grotesk",sans-serif; font-size: 17px; font-weight: 500; margin-top: 12px; }
-.workspace-account-label p { color: var(--muted-foreground); font-size: 11px; line-height: 1.7; margin-top: 4px; }
-.workspace-menu-separator { height: 1px; background: var(--border); margin: 3px 5px; }
-.workspace-menu-item { min-height: 44px; display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 9px; cursor: pointer; font-size: 12px; user-select: none; }
-.workspace-menu-item[data-highlighted] { background: var(--secondary); outline: 2px solid var(--ring); outline-offset: -2px; }
-.workspace-menu-item[data-disabled] { opacity: .6; pointer-events: none; }
-.workspace-menu-logout { color: var(--destructive); }
-.workspace-menu-error { padding: 12px; font-size: 11px; line-height: 1.8; }
 .workspace-mobile-brand,.workspace-mobile-menu,.workspace-bottom-nav { display: none; }
 .workspace-content { width: min(1184px,100%); margin-inline: auto; padding: 43px 40px 0; min-width: 0; }
 .workspace-page { min-height: calc(100dvh - 203px); }
@@ -133,7 +118,6 @@
 .workspace-footer a { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; }
 .workspace-enter { animation: workspace-page-in 180ms ease-out; }
 @keyframes workspace-page-in { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes workspace-menu-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 1199px) {
   .workspace-overview-grid,.workspace-billing-grid { grid-template-columns: minmax(0,1fr); }
   .workspace-discovery { margin-top: 5px; }
@@ -167,8 +151,6 @@
 @media (max-width: 639px) {
   .workspace-topbar { min-height: 69px; padding: 10px 15px; gap: 8px; }
   .workspace-header-actions { gap: 3px; }
-  .workspace-account-trigger { padding: 4px; border-color: transparent; background: transparent; }
-  .workspace-account-name,.workspace-account-chevron { display: none; }
   .workspace-content { padding: 29px 18px 0; }
   .workspace-page-heading { margin-bottom: 25px; gap: 15px; flex-wrap: wrap; }
   .workspace-page-heading h1 { font-size: 32px; }
@@ -202,6 +184,12 @@
   .workspace-footer > span { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .workspace-enter,.workspace-account-menu { animation: none; }
+  .workspace-enter { animation: none; }
   .workspace-nav a,.workspace-quick-action { transition: none; }
 }
+.metro-notifications { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.metro-notifications li { padding: 1rem; border: 1px solid var(--border); border-radius: 1rem; overflow-wrap: anywhere; }
+.metro-notifications .is-unread { border-inline-start: 3px solid var(--primary); }
+.metro-notifications .workspace-access-actions { flex-wrap: wrap; }
+.notification-inbox { padding: clamp(16px,3vw,28px); }
+.workspace-notification-link { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }

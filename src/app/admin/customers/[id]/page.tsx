@@ -1,0 +1,10 @@
+import { formatMyanmarTime } from "@/lib/myanmar-time";
+import Link from "next/link";
+import { adminPage, getAdminRepository } from "@/server/admin";
+import { AdminHeading, AdminNotice } from "@/components/admin/admin-views";
+
+export default async function CustomerDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const customer = await adminPage(async () => (await getAdminRepository()).customer(id));
+  return <><AdminHeading eyebrow="METRO / CUSTOMERS" title={customer.name} description="Website account details and recorded service references." /><section className="admin-panel"><dl className="admin-details"><div><dt>Email</dt><dd>{customer.email}</dd></div><div><dt>Verification</dt><dd>{customer.emailVerified ? "Verified" : "Unverified"}</dd></div><div><dt>Website user ID</dt><dd>{customer.id}</dd></div><div><dt>Registered</dt><dd>{formatMyanmarTime(customer.createdAt)}</dd></div><div><dt>Orders / Service references</dt><dd>{customer._count.websiteOrders} / {customer._count.services}</dd></div></dl><div className="admin-inline-links"><Link href={`/admin/orders?q=${encodeURIComponent(customer.email)}`}>Customer orders</Link><Link href={`/admin/vpn?q=${encodeURIComponent(customer.email)}`}>Service snapshots</Link><Link href={`/admin/support?q=${encodeURIComponent(customer.email)}`}>Customer issues</Link></div></section><section className="admin-panel"><div className="admin-panel-heading"><h2>Service references</h2></div>{customer.references.length ? <ul className="admin-reference-list">{customer.references.map(reference => <li key={reference.id}><Link href={`/admin/vpn/${reference.id}`} className="text-link">{reference.id}</Link><span>Version {reference.version} · Captured {formatMyanmarTime(reference.capturedAt)}</span></li>)}</ul> : <p className="admin-inline-empty">This account has no recorded website service reference.</p>}</section><AdminNotice title="Customer boundaries stay intact">These are website records only. No Telegram identity, session token, password hash or VPN credential is included in this view.</AdminNotice></>;
+}
