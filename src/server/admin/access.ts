@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { PrismaClient, Prisma } from "../db/generated/client";
 import { authenticatedSession, FoundationError, readWebsiteSession, requireOwnerSession, type SessionReader, type VerifiedSession } from "../owner/authorization";
+import { securityDiagnostic } from "../security/diagnostics";
 
 export type AdminContext = { tx: Prisma.TransactionClient; session: VerifiedSession; now: Date; account: { id: string; name: string; email: string } };
 
@@ -30,6 +31,7 @@ export function buildAdminAccess(db: PrismaClient, readSession: SessionReader = 
         return work({ tx, session, now, account });
       }, { isolationLevel: "ReadCommitted", maxWait: 10000, timeout: 15000 });
     } catch (error) {
+      if (error instanceof FoundationError && ["FORBIDDEN", "UNAUTHENTICATED", "RECENT_AUTH_REQUIRED"].includes(error.code)) securityDiagnostic("OWNER_DENIED");
       if (error instanceof FoundationError) throw error;
       throw new FoundationError("UNAVAILABLE");
     }

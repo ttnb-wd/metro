@@ -18,7 +18,9 @@
     "typecheck:tools": "tsc --noEmit --project tsconfig.tools.json",
     "worker:commerce": "node --conditions=react-server --import tsx scripts/commerce-worker.mts",
     "worker:notifications": "node --conditions=react-server --import tsx scripts/notification-worker.mts",
-    "check:vercel-env": "node --conditions=react-server --import tsx scripts/vercel-preflight.mts"
+    "check:vercel-env": "node --conditions=react-server --import tsx scripts/vercel-preflight.mts",
+    "verify:release": "node scripts/verify-release.mjs",
+    "audit:evidence": "node --conditions=react-server --import tsx scripts/evidence/reconcile.mts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "1.7.11",

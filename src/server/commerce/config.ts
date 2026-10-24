@@ -13,6 +13,6 @@ export function paymentMethods(source = process.env): PaymentMethod[] {
     return z.array(paymentMethodSchema).max(10).parse(data).filter(method => !/YOUR_|REPLACE|EXAMPLE/i.test(`${method.accountName} ${method.accountNumber}`));
   } catch { return []; }
 }
-export function fulfilmentEnabled(source = process.env) { return source.METRO_FULFILMENT_ENABLED === "true" && source.METRO_VPN_EXECUTION_APPROVED === "true"; }
+export function fulfilmentEnabled(source = process.env) { return source.METRO_FULFILMENT_ENABLED === "true" && source.METRO_VPN_EXECUTION_APPROVED === "true" && source.METRO_VPN_FULFILMENT_RECEIPTS_VERIFIED === "true"; }
 
-export function commerceEnabled() { return fulfilmentEnabled() && serviceConfigured(); }
+export function commerceEnabled() { return process.env.METRO_FULFILMENT_ENABLED === "true" && process.env.METRO_VPN_EXECUTION_APPROVED === "true" && serviceConfigured(); }

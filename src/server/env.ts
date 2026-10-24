@@ -83,6 +83,7 @@ export type EnabledAuthEnvironment = {
   trustedIpHeader?: "x-real-ip" | "cf-connecting-ip";
   runtimeRole?: "neondb_owner" | "metro_runtime";
   foundationEnabled?: boolean;
+  platform?: "vercel";
 };
 
 export type AuthEnvironment = EnabledAuthEnvironment | {
@@ -114,6 +115,7 @@ export function parseServerEnvironment(source: EnvironmentSource): AuthEnvironme
     trustedIpHeader: result.data.METRO_AUTH_TRUSTED_IP_HEADER,
     runtimeRole: result.data.METRO_DATABASE_RUNTIME_ROLE,
     foundationEnabled: result.data.METRO_WEBSITE_FOUNDATION_ENABLED === "true",
+    platform: source.VERCEL === "1" ? "vercel" : undefined,
   };
 }
 

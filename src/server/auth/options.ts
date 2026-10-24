@@ -66,10 +66,9 @@ export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: P
       disableCSRFCheck: false,
       disableOriginCheck: false,
       database: { generateId: "uuid", validateSchema: true },
-      // The route overwrites this internal header; arbitrary forwarded IPs
-      // are never trusted. Without an explicitly reviewed proxy, use one
-      // conservative shared rate-limit bucket instead of a spoofable IP.
-      ipAddress: { ipAddressHeaders: [INTERNAL_AUTH_IP_HEADER], ipv6Subnet: 64 },
+      // Server-generated, opaque per-account identity; do not aggregate its
+      // bits as though it were an actual IPv6 network.
+      ipAddress: { ipAddressHeaders: [INTERNAL_AUTH_IP_HEADER], ipv6Subnet: 128 },
     },
     logger: { disabled: true },
   } satisfies BetterAuthOptions;

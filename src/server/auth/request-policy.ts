@@ -1,5 +1,6 @@
 import "server-only";
 import { isIP } from "node:net";
+import { createHmac } from "node:crypto";
 import type { EnabledAuthEnvironment } from "@/server/env";
 import { isSafeAuthCallback } from "@/server/auth/redirects";
 import { INTERNAL_AUTH_IP_HEADER } from "@/server/auth/options";
@@ -72,6 +73,7 @@ export async function prepareAuthRequest(request: Request, environment: EnabledA
     }
   }
   let body: string | undefined;
+  let account: string | undefined;
   if (request.method === "POST") {
     if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
       throw new AuthRequestError(415, "JSON_REQUIRED");
@@ -81,10 +83,32 @@ export async function prepareAuthRequest(request: Request, environment: EnabledA
     try { parsed = JSON.parse(body); } catch { throw new AuthRequestError(400, "INVALID_BODY"); }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new AuthRequestError(400, "INVALID_BODY");
     validateCallbacks(parsed as Record<string, unknown>, environment.origin);
+    const email = (parsed as Record<string, unknown>).email;
+    const token = (parsed as Record<string, unknown>).token;
+    if (typeof email === "string") account = `email:${email.trim().toLowerCase()}`;
+    else if (typeof token === "string") account = `verification:${token}`;
   }
   const headers = new Headers(request.headers);
-  const trustedIp = environment.trustedIpHeader ? headers.get(environment.trustedIpHeader)?.trim() : undefined;
-  for (const key of ["x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", INTERNAL_AUTH_IP_HEADER]) headers.delete(key);
-  headers.set(INTERNAL_AUTH_IP_HEADER, trustedIp && isIP(trustedIp) ? trustedIp : "127.0.0.1");
+  // Vercel overwrites x-real-ip at its ingress. An environment flag describing
+  // the actual hosting platform is required; client headers cannot enable it.
+  // Other production hosts need their own reviewed ingress adapter, not a
+  // configurable arbitrary forwarded header or a shared loopback fallback.
+  const trustedIp = environment.platform === "vercel" ? headers.get("x-real-ip")?.trim() : undefined;
+  if (environment.nodeEnv === "production" && (!trustedIp || !isIP(trustedIp))) {
+    throw new AuthRequestError(503, "AUTH_SOURCE_UNAVAILABLE");
+  }
+  // Verification links have independent opaque token budgets; invalid links
+  // cannot consume another customer's valid-link budget. The separate trusted
+  // production source budget also limits attacks that rotate random tokens.
+  const cookie = headers.get("cookie");
+  const identity = account ?? (cookie ? `session:${cookie}` : `anonymous-source:${trustedIp ?? "development"}`);
+  // Account scope prevents unrelated users (including users behind a NAT) from
+  // sharing a login/verification bucket. It also cannot be rotated with spoofed
+  // IP headers. Missing development IP information never becomes a global
+  // authentication bucket. The synthetic address contains no personal data.
+  const digest = createHmac("sha256", environment.secret).update(identity).digest("hex").slice(0, 32);
+  for (const key of ["x-forwarded-for", "x-vercel-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "x-metro-auth-source", INTERNAL_AUTH_IP_HEADER]) headers.delete(key);
+  if (trustedIp && isIP(trustedIp)) headers.set("x-metro-auth-source", createHmac("sha256", environment.secret).update(`source:${trustedIp}`).digest("hex"));
+  headers.set(INTERNAL_AUTH_IP_HEADER, digest.match(/.{4}/g)!.join(":"));
   return new Request(url.href, { method: request.method, headers, body, signal: request.signal });
 }

@@ -12,7 +12,9 @@ try { checks.authentication = parseServerEnvironment(source).enabled; } catch { 
 checks.privateImageKitStorage = source.METRO_EVIDENCE_PROVIDER === "imagekit" && evidenceStorageReady(source);
 try { readSmtpEnvironment(source); checks.smtpConfiguration = true; } catch { checks.smtpConfiguration = false; }
 checks.vpnServiceConfiguration = serviceConfigured(source);
+checks.verifiedFulfilmentReceipts = source.METRO_VPN_FULFILMENT_RECEIPTS_VERIFIED === "true";
 checks.websitePaymentMethods = paymentMethods(source).length > 0;
 checks.noLocalEvidenceDependency = !source.METRO_EVIDENCE_DIRECTORY && !source.METRO_EVIDENCE_ENCRYPTION_KEY;
-console.log(JSON.stringify({ checks, result: Object.values(checks).every(Boolean) ? "PASS" : "BLOCKED", offlineOnly: true }));
+console.log(JSON.stringify({ checks, result: Object.values(checks).every(Boolean) ? "PASS" : "BLOCKED", offlineOnly: true,
+  hostingEligibility: "Separate written Vercel VPN-storefront eligibility confirmation and a commercial plan are required; this check cannot grant provider approval." }));
 if (!Object.values(checks).every(Boolean)) process.exitCode = 1;

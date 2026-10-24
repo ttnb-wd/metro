@@ -11,7 +11,7 @@ import { orderNumber } from "@/features/pricing/receipt";
 import { paymentMethodSchema } from "../commerce/config";
 import { currentProvisioning } from "@/features/pricing/order-status";
 
-export type AdminRow = { id: string; cells: string[]; href?: string; history?: string[]; description?: string; rejectable?: boolean; evidence?: boolean };
+export type AdminRow = { id: string; cells: string[]; href?: string; history?: string[]; description?: string; rejectable?: boolean; evidence?: boolean; reviewedVersion?: number; reviewedSha256?: string };
 export type AdminTable = { columns: string[]; rows: AdminRow[]; total: number; page: number; pageSize: number; query: string };
 export const adminQuerySchema = z.object({ q: z.string().trim().max(80).default(""), page: z.coerce.number().int().min(1).max(10000).default(1) });
 export type RecordSection = "customers" | "orders" | "payments" | "vpn" | "support" | "notifications" | "audit";
@@ -35,7 +35,7 @@ export function buildAdminRepository(db: PrismaClient, readSession?: SessionRead
     async order(orderId: string) {
       if (!z.uuid().safeParse(orderId).success) throw new FoundationError("NOT_FOUND");
       return access(async ({ tx }) => {
-        const row = await tx.websiteOrder.findUnique({ where: { id: orderId }, select: { id: true, userId: true, quoteSnapshot: true, totalMmk: true, state: true, payment: true, provisioning: true, createdAt: true, user: { select: { name: true, email: true } }, evidence: { orderBy: { createdAt: "desc" }, select: { id: true, createdAt: true, decisions: { select: { decision: true, createdAt: true, reasonCode: true } } } }, operations: { select: { id: true, state: true, version: true, kind: true } } } });
+        const row = await tx.websiteOrder.findUnique({ where: { id: orderId }, select: { id: true, userId: true, quoteSnapshot: true, totalMmk: true, version: true, state: true, payment: true, provisioning: true, createdAt: true, user: { select: { name: true, email: true } }, evidence: { orderBy: { createdAt: "desc" }, select: { id: true, sha256: true, createdAt: true, decisions: { select: { decision: true, createdAt: true, reasonCode: true } } } }, operations: { select: { id: true, state: true, version: true, kind: true } } } });
         if (!row) throw new FoundationError("NOT_FOUND");
         const plan = z.object({ packageName: z.string().max(80), durationDays: z.number().int().positive(), totalDataGb: z.number().int().positive(), pricingVersion: z.number().int().positive() }).safeParse(row.quoteSnapshot);
         const method = z.object({ paymentMethod: paymentMethodSchema }).safeParse(row.quoteSnapshot);
@@ -106,11 +106,11 @@ export function buildAdminRepository(db: PrismaClient, readSession?: SessionRead
           }
           case "payments": {
             const where = { order: { user: userFilter } };
-            const result = await tx.paymentEvidence.findMany({ where, ...pagination, orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, mediaType: true, bytes: true, createdAt: true, order: { select: { id: true, quoteSnapshot: true, totalMmk: true, state: true, payment: true, provisioning: true, operations: { where: { kind: "PROVISION" }, take: 1, select: { state: true } }, user: { select: { name: true, email: true } } } }, decisions: { orderBy: { createdAt: "desc" }, take: 1, select: { decision: true, createdAt: true } } } });
+            const result = await tx.paymentEvidence.findMany({ where, ...pagination, orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, sha256: true, mediaType: true, bytes: true, createdAt: true, order: { select: { id: true, quoteSnapshot: true, totalMmk: true, version: true, state: true, payment: true, provisioning: true, operations: { where: { kind: "PROVISION" }, take: 1, select: { state: true } }, user: { select: { name: true, email: true } } } }, decisions: { orderBy: { createdAt: "desc" }, take: 1, select: { decision: true, createdAt: true } } } });
             total = await tx.paymentEvidence.count({ where }); columns = ["Evidence / Order", "Customer", "Package / days", "Amount", "Payment method", "Submitted · Myanmar time", "Review / Fulfilment"];
             rows = result.map(row => {
               const plan = z.object({ packageName: z.string(), durationDays: z.number(), paymentMethod: paymentMethodSchema }).safeParse(row.order.quoteSnapshot);
-              return { id: row.id, href: `/admin/orders/${row.order.id}`, evidence: true, rejectable: row.decisions.length === 0 && row.order.state === "AWAITING_PAYMENT" && row.order.payment === "UNDER_REVIEW", cells: [orderNumber(row.order.id), `${row.order.user.name} · ${row.order.user.email}`, plan.success ? `${plan.data.packageName} · ${plan.data.durationDays} days` : "Not recorded", formatWebsiteMmk(row.order.totalMmk.toFixed(0)), plan.success ? plan.data.paymentMethod.name : "Not recorded", date(row.createdAt), `${row.decisions[0] ? label(row.decisions[0].decision) : label(row.order.payment)} · ${label(currentProvisioning(row.order, row.order.operations[0]?.state))}`] };
+              return { id: row.id, reviewedVersion: row.order.version, reviewedSha256: row.sha256, href: `/admin/orders/${row.order.id}`, evidence: true, rejectable: row.decisions.length === 0 && row.order.state === "AWAITING_PAYMENT" && row.order.payment === "UNDER_REVIEW", cells: [orderNumber(row.order.id), `${row.order.user.name} · ${row.order.user.email}`, plan.success ? `${plan.data.packageName} · ${plan.data.durationDays} days` : "Not recorded", formatWebsiteMmk(row.order.totalMmk.toFixed(0)), plan.success ? plan.data.paymentMethod.name : "Not recorded", date(row.createdAt), `${row.decisions[0] ? label(row.decisions[0].decision) : label(row.order.payment)} · ${label(currentProvisioning(row.order, row.order.operations[0]?.state))}`] };
             }); break;
           }
           case "vpn": {
@@ -156,9 +156,9 @@ export function buildAdminRepository(db: PrismaClient, readSession?: SessionRead
     async paymentRejectionTarget(evidenceId: string) {
       if (!z.uuid().safeParse(evidenceId).success) throw new FoundationError("INVALID_REQUEST");
       return access(async ({ tx }) => {
-        const evidence = await tx.paymentEvidence.findUnique({ where: { id: evidenceId }, select: { id: true, orderId: true, userId: true, order: { select: { totalMmk: true } } } });
+        const evidence = await tx.paymentEvidence.findUnique({ where: { id: evidenceId }, select: { id: true, orderId: true, userId: true, sha256: true, order: { select: { totalMmk: true, version: true } } } });
         if (!evidence) throw new FoundationError("NOT_FOUND");
-        return { evidenceId: evidence.id, orderId: evidence.orderId, userId: evidence.userId, amountMmk: evidence.order.totalMmk.toFixed(0) };
+        return { evidenceId: evidence.id, orderId: evidence.orderId, userId: evidence.userId, amountMmk: evidence.order.totalMmk.toFixed(0), reviewedVersion: evidence.order.version, reviewedSha256: evidence.sha256 };
       }, true);
     },
   };

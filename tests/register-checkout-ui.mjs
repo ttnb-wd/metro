@@ -1,0 +1,3 @@
+import{registerHooks}from'node:module';
+// Only replace Next Image's bundler interop in the standalone React render test.
+registerHooks({resolve(name,context,next){if(name==='next/navigation')return{url:new URL('./checkout-router-stub.mjs',import.meta.url).href,shortCircuit:true};if(name==='next/image')return{url:new URL('./checkout-image-stub.mjs',import.meta.url).href,shortCircuit:true};return next(name,context)},load(url,context,next){if(url.endsWith('.css'))return{format:'module',source:'export default new Proxy({}, {get: (_target,key) => String(key)});',shortCircuit:true};return next(url,context)}});

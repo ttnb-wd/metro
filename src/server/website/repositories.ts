@@ -16,6 +16,7 @@ import { rejectionReasonSchema, rejectionReasons } from "@/features/pricing/paym
 import { checkoutInvoiceSchema } from "../commerce/quote";
 import type { OrderReceipt } from "@/features/pricing/receipt";
 import { currentProvisioning } from "@/features/pricing/order-status";
+import { securityDiagnostic } from "../security/diagnostics";
 
 type Tx = Prisma.TransactionClient;
 const uuid = z.uuid();
@@ -26,6 +27,7 @@ const evidenceSchema = z.strictObject({ orderId: uuid, storageRef: evidenceRefer
 const checkoutEvidenceSchema = evidenceSchema.omit({ orderId: true }).extend({ mediaType: z.literal("image/png"), bytes: z.number().int().min(1).max(MAX_PAYMENT_PROOF_BYTES) });
 const ownerTarget = { userId: uuid };
 const paymentSchema = z.strictObject({ ...ownerTarget, orderId: uuid, evidenceId: uuid, verificationRef: uuid,
+  reviewedVersion: z.number().int().nonnegative(), reviewedSha256: z.string().regex(/^[a-f0-9]{64}$/),
   amountMmk: z.string().regex(/^[1-9][0-9]{0,29}$/), decision: z.enum(["APPROVED", "REJECTED"]), rejectionReason: rejectionReasonSchema.optional() });
 const issueInput = z.strictObject({ serviceId: uuid, category: z.enum(["CANNOT_CONNECT", "UNSTABLE_CONNECTION"]), description: text });
 const diagnosisInput = z.strictObject({ ...ownerTarget, issueId: uuid, version: z.number().int().nonnegative(), result: z.enum(["SUCCEEDED", "FAILED"]) });
@@ -134,6 +136,7 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
         return { id: resultId };
       }, isolationLevel);
     } catch (error) {
+      if (ownerOnly && !authorizedActor) securityDiagnostic("OWNER_DENIED");
       // The business transaction rolled back. Failure audit is a separate, sanitized append.
       if (ownerOnly && authorizedActor && targetUserId) {
         try { await transaction(async (tx, session, now) => { await owner(tx, session, now);
@@ -176,9 +179,11 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
       return mutate("EVIDENCE_ADD", request, metadata, false, undefined, "OWNER_READ", orderId, async (tx, userId, _actor, now) => {
         const id = orderId;
         const order = await lockOrder(tx, id, userId);
-        const existing = await tx.paymentEvidence.findFirst({ where: { orderId: id, userId } });
-        if (existing) { if (existing.sha256 !== proof.sha256) conflict(); return id; }
-        if (order.state !== "AWAITING_PAYMENT" || order.payment !== "UNVERIFIED") conflict();
+        const existing = await tx.paymentEvidence.findFirst({ where: { orderId: id, userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+        if (existing && order.payment !== "REJECTED") { if (existing.sha256 !== proof.sha256) conflict(); return id; }
+        if (order.state !== "AWAITING_PAYMENT" || !["UNVERIFIED", "REJECTED"].includes(order.payment)) conflict();
+        if (existing && !await tx.paymentDecision.findFirst({ where: { evidenceId: existing.id, decision: "REJECTED" } })) conflict();
+        if (await tx.paymentEvidence.count({ where: { orderId: id, userId } }) >= 3) conflict();
         const evidence = await tx.paymentEvidence.create({ data: { ...proof, orderId: id, userId } });
         await tx.websiteOrder.update({ where: { id, userId }, data: { payment: "UNDER_REVIEW", version: { increment: 1 } } });
         if (notificationsEnabled()) {
@@ -191,9 +196,30 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
     async checkoutReceipt(orderId: string) { parse(uuid, orderId); return transaction(async (tx, session) => {
       const order = await tx.websiteOrder.findFirst({ where: { id: orderId, userId: session.user.id }, select: { id: true, payment: true } });
       if (!order) return null;
-      const receipt = await tx.paymentEvidence.findFirst({ where: { orderId: order.id, userId: session.user.id }, orderBy: { createdAt: "asc" }, select: { id: true, storageRef: true, sha256: true } });
+      const receipt = await tx.paymentEvidence.findFirst({ where: { orderId: order.id, userId: session.user.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, storageRef: true, sha256: true } });
       return receipt ? { ...receipt, orderId: order.id, payment: order.payment } : null;
     }); },
+    async reserveEvidenceUpload(orderId: string) {
+      parse(uuid, orderId);
+      return transaction(async (tx, session) => {
+        const userId = session.user.id;
+        // Account lock bounds concurrent storage spending across different drafts.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`evidence-budget:${userId}`},0))::text`;
+        const order = await lockOrder(tx, orderId, userId);
+        if (order.state !== "AWAITING_PAYMENT" || !["UNVERIFIED", "REJECTED"].includes(order.payment)) conflict();
+        const prior = await tx.paymentEvidence.findFirst({ where: { orderId, userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+        if (prior && (order.payment !== "REJECTED" || !await tx.paymentDecision.findFirst({ where: { evidenceId: prior.id, decision: "REJECTED" } }))) conflict();
+        if (await tx.paymentEvidence.count({ where: { orderId, userId } }) >= 3) conflict();
+        const digest = createHash("sha256").update(`evidence-upload:${orderId}`).digest("hex");
+        // Existing CHECKPOINT receipts retain failed attempts too: ten 4 MiB
+        // attempts per order, 100 per account for its lifetime (400 MiB cap).
+        if (await tx.websiteRequest.count({ where: { userId, action: "CHECKPOINT", digest } }) >= 10
+          || await tx.websiteRequest.count({ where: { userId, action: "CHECKPOINT", resultId: { startsWith: "evidence-upload:" } } }) >= 100) conflict();
+        const id = randomUUID();
+        await tx.websiteRequest.create({ data: { id, actorId: userId, userId, action: "CHECKPOINT", key: id, digest, state: "DONE", resultId: `evidence-upload:${orderId}:${id}` } });
+        return id;
+      }, "ReadCommitted");
+    },
     async evidenceIsUnreferenced(orderId: string, storageRef: string) {
       parse(uuid, orderId); parse(evidenceReferenceSchema, storageRef);
       // Serialize recovery with submission before deciding whether an upload
@@ -287,17 +313,10 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
     },
     async addEvidence(input: unknown, metadata: RequestMetadata) {
       const data = parse(evidenceSchema, input);
-      return mutate("EVIDENCE_ADD", data, metadata, false, undefined, "OWNER_READ", data.orderId, async (tx, userId) => {
-        const order = await lockOrder(tx, data.orderId, userId);
-        if (!["UNVERIFIED", "REJECTED", "UNDER_REVIEW"].includes(order.payment) || order.state !== "AWAITING_PAYMENT") conflict();
-        const row = await tx.paymentEvidence.create({ data: { ...data, userId } });
-        await tx.websiteOrder.update({ where: { id: order.id, userId }, data: { payment: "UNDER_REVIEW", version: { increment: 1 } } });
-        if (notificationsEnabled()) {
-          const binding = await tx.ownerBinding.findUnique({ where: { slot: 1 }, select: { userId: true } });
-          if (binding) await queueNotice(tx, { userId: binding.userId, audience: "OWNER", kind: "PAYMENT_PROOF_SUBMITTED", dedupeKey: `payment-proof:${row.id}`, href: `/admin/orders/${order.id}`, payload: { title: "Payment proof is awaiting review", message: "Review the private receipt and verify the actual receiving account and exact order amount before approving payment.", action: "Review payment", observedAt: new Date().toISOString() } });
-        }
-        return row.id;
-      });
+      const { orderId, ...proof } = data;
+      await this.submitDraftPayment(orderId, proof, metadata);
+      const accepted = found(await this.checkoutReceipt(orderId));
+      return { id: accepted.id };
     },
     async listEvidence(orderId: string) { parse(uuid, orderId); return transaction(async (tx, session) => {
       found(await tx.websiteOrder.findFirst({ where: { id: orderId, userId: session.user.id }, select: { id: true } }));
@@ -307,7 +326,8 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
       const data = parse(paymentSchema, input); const reason = data.decision === "APPROVED" ? "PAYMENT_MATCHED" : "EVIDENCE_REJECTED";
       return mutate("PAYMENT_DECISION", data, metadata, true, data.userId, reason, data.orderId, async (tx, userId, actorId) => {
         const order = await lockOrder(tx, data.orderId, userId);
-        found(await tx.paymentEvidence.findFirst({ where: { id: data.evidenceId, orderId: order.id, userId } }));
+        const evidence = found(await tx.paymentEvidence.findFirst({ where: { id: data.evidenceId, orderId: order.id, userId } }));
+        if (evidence.sha256 !== data.reviewedSha256) conflict();
         if (order.totalMmk.toFixed(0) !== data.amountMmk) conflict();
         const prior = await tx.paymentDecision.findUnique({ where: { verificationRef: data.verificationRef } });
         if (prior) {
@@ -319,11 +339,16 @@ export function buildRepositories(db: PrismaClient, readSession: SessionReader =
         if (await tx.paymentDecision.findFirst({ where: { evidenceId: data.evidenceId } })) conflict();
         if (data.rejectionReason && (data.decision !== "REJECTED" || !notificationsEnabled())) throw new FoundationError("UNAVAILABLE");
         if (order.payment !== "UNDER_REVIEW" || order.state !== "AWAITING_PAYMENT") conflict();
+        if (order.version !== data.reviewedVersion) conflict();
+        const latest = await tx.paymentEvidence.findFirst({ where: { orderId: order.id, userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
+        if (latest?.id !== evidence.id) conflict();
         assertTransition("payment", "UNDER_REVIEW", data.decision === "APPROVED" ? "CONFIRMED" : "REJECTED", { paymentAuthorityVerified: true, verificationId: data.verificationRef });
-        const { rejectionReason, ...decisionData } = data;
+        const { rejectionReason, reviewedVersion: _reviewedVersion, reviewedSha256: _reviewedSha256, ...decisionData } = data;
+        void _reviewedVersion; void _reviewedSha256;
         const decision = await tx.paymentDecision.create({ data: { ...decisionData, ownerId: actorId, reasonCode: reason } });
         if (data.decision === "REJECTED" && rejectionReason) await queueNotice(tx, { userId, audience: "CUSTOMER", kind: "PAYMENT_REJECTED", dedupeKey: `payment-decision:${decision.id}`, href: `/dashboard/orders/${order.id}`, payload: { title: "Payment proof needs attention", message: rejectionReasons[rejectionReason], action: "Review order", observedAt: new Date().toISOString() } });
         if (data.decision === "APPROVED") {
+          await queueNotice(tx, { userId, audience: "CUSTOMER", kind: "PAYMENT_CONFIRMED", dedupeKey: `payment-decision:${decision.id}`, href: `/dashboard/orders/${order.id}`, payload: { title: "Metro confirmed your payment", message: "Your payment was confirmed after OWNER review. VPN activation is queued and will be shown separately when its finite quota and expiry are verified.", action: "View order", observedAt: new Date().toISOString() } });
           assertTransition("order", "AWAITING_PAYMENT", "FULFILMENT_PENDING", { payment: "CONFIRMED" });
           const operation = await tx.websiteOperation.create({ data: { userId, kind: "PROVISION", resourceKey: order.id, orderId: order.id, frozenSnapshot: order.quoteSnapshot as Prisma.InputJsonValue } });
           await tx.websiteOutboxEvent.create({ data: { userId, operationId: operation.id, topic: "VPN_FULFILMENT_REQUESTED", businessKey: `fulfil:${order.id}`, resourceId: order.id } });

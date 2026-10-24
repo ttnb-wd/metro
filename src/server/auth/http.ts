@@ -6,8 +6,14 @@ import { AuthRequestError, prepareAuthRequest } from "@/server/auth/request-poli
 import { assertWebsiteDatabaseReady } from "@/server/db/verify-target";
 import { publicAuthPayload } from "@/server/auth/public-response";
 import { profileNameInput, profileSessionError } from "./profile";
+import { securityDiagnostic } from "../security/diagnostics";
+import { consumeAuthBudget } from "./rate-budget";
+import { getPrisma } from "../db/client";
 
 function errorResponse(status: number, code: string) {
+  if (status === 401 || status === 403) securityDiagnostic("AUTH_DENIED");
+  if (status === 429) securityDiagnostic("AUTH_RATE_LIMITED");
+  if (code === "AUTH_SOURCE_UNAVAILABLE") securityDiagnostic("AUTH_SOURCE_UNAVAILABLE");
   return Response.json({ error: { code, message: status === 503 ? "Metro authentication is not available." : "Invalid authentication request." } }, {
     status,
     headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
@@ -43,6 +49,7 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
       verificationRequest = new Request(url, { headers, signal: prepared.signal });
     }
     await assertWebsiteDatabaseReady(environment);
+    await consumeAuthBudget(getPrisma(environment), prepared);
     if (path === "/update-user") {
       const session = await getAuth().api.getSession({ headers: prepared.headers, query: { disableCookieCache: true } });
       const failure = profileSessionError(session);
@@ -52,6 +59,8 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
     const response = verificationRequest ? await handlers.GET(verificationRequest)
       : request.method === "POST" ? await handlers.POST(prepared) : await handlers.GET(prepared);
     const headers = new Headers(response.headers);
+    if (response.status === 429) securityDiagnostic("AUTH_RATE_LIMITED");
+    else if (response.status === 401 || response.status === 403) securityDiagnostic("AUTH_DENIED");
     headers.set("Cache-Control", "no-store");
     headers.set("X-Content-Type-Options", "nosniff");
     headers.delete("content-length");

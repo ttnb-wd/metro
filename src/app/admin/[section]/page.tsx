@@ -1,5 +1,5 @@
 import { LiveRefresh } from "@/components/commerce/live-refresh";
-import { commerceEnabled } from "@/server/commerce/config";
+import { fulfilmentEnabled } from "@/server/commerce/config";
 import { CatalogImport } from "@/components/admin/catalog-import";
 import { serviceConfigured } from "@/server/vpn/transport";
 import { randomUUID } from "node:crypto";
@@ -27,7 +27,7 @@ export default async function AdminSectionPage({ params, searchParams }: { param
   } else if (section === "settings") {
     const account = await adminPage(() => repository.identity());
     const pricing = await adminPage(async () => (await getPricingRepository()).readForOwner());
-    content = <><section className="admin-panel"><div className="admin-panel-heading"><div><h2>Your OWNER account</h2><p>Authorization is bound to your immutable website user ID.</p></div><span className="admin-status">Verified OWNER</span></div><dl className="admin-details"><div><dt>Email</dt><dd>{account.email}</dd></div><div><dt>Website user ID</dt><dd>{account.id}</dd></div><div><dt>Website pricing</dt><dd>{pricing.status === "READY" ? `Published version ${pricing.release.version}` : pricing.status === "MIGRATION_PENDING" ? "Migration and runtime grants pending" : pricing.status === "UNPUBLISHED" ? "Ready for first publication" : "Unavailable"}</dd></div><div><dt>VPN fulfilment</dt><dd>{commerceEnabled() ? "Enabled · OWNER payment review required" : "Paused"}</dd></div></dl><ProfileNameForm name={account.name} /></section><AdminNotice title="Sensitive actions require a recent login">Sign out and sign in again before publishing prices or recording payment decisions. The five-minute requirement uses your actual database session creation time.</AdminNotice></>;
+    content = <><section className="admin-panel"><div className="admin-panel-heading"><div><h2>Your OWNER account</h2><p>Authorization is bound to your immutable website user ID.</p></div><span className="admin-status">Verified OWNER</span></div><dl className="admin-details"><div><dt>Email</dt><dd>{account.email}</dd></div><div><dt>Website user ID</dt><dd>{account.id}</dd></div><div><dt>Website pricing</dt><dd>{pricing.status === "READY" ? `Published version ${pricing.release.version}` : pricing.status === "MIGRATION_PENDING" ? "Migration and runtime grants pending" : pricing.status === "UNPUBLISHED" ? "Ready for first publication" : "Unavailable"}</dd></div><div><dt>VPN fulfilment</dt><dd>{fulfilmentEnabled() ? "Enabled · OWNER payment review required" : "Paused · production worker activation gate is closed"}</dd></div></dl><ProfileNameForm name={account.name} /></section><AdminNotice title="Sensitive actions require a recent login">Sign out and sign in again before publishing prices or recording payment decisions. The five-minute requirement uses your actual database session creation time.</AdminNotice></>;
   } else if (section === "reports") {
     const data = await adminPage(() => repository.overview());
     const report = await adminPage(() => repository.reports());

@@ -45,3 +45,26 @@ temp/
 *.log
 .DS_Store
 Thumbs.db
+# Security release verification must be reproducible from a checkout.
+# Operational/live scripts and all other local tests/docs remain ignored.
+!tests/
+tests/*
+!tests/*.test.mts
+!tests/register-*.mjs
+!tests/*-stub.*
+!tests/commerce-e2e-fixture.mjs
+!tests/fake-imagekit.mts
+!tests/fulfilment-fixture.mts
+!tests/review-initial-migration.mts
+!tests/prisma-rehearsal.mjs
+!tests/prisma.disposable.config.ts
+!tests/backup-restore-rehearsal.mjs
+!tests/current-release-role-policy.mjs
+!tests/run-website-foundation.mjs
+!tests/run-checkout.mjs
+!tests/run-admin-pricing.mjs
+!tests/run-notifications.mjs
+!tests/run-security-remediation.mjs
+!tests/run-fulfilment-receipts.mjs
+!tests/run-website-workers.mjs
+!tests/step05-protected-baseline.json

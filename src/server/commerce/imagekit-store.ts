@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { FoundationError } from "../owner/authorization";
 import { imageKitReferenceSchema } from "./evidence-reference";
+import { securityDiagnostic } from "../security/diagnostics";
 
 const folder = "/metro/payment-evidence";
 const storedLimit = 5 * 1024 * 1024; // Preserve original evidence during a later migration.
@@ -51,9 +52,9 @@ export function buildImageKitStore(configuration: Configuration, dependencies: {
   }
   return {
     // The caller must have decoded/re-encoded the file before this boundary.
-    async putNormalized(bytes: Buffer) {
+    async putNormalized(bytes: Buffer, reservedId?: string) {
       if (!bytes.length || bytes.length > storedLimit) throw new FoundationError("INVALID_REQUEST");
-      const uploadId = randomUUID(), digest = createHash("sha256").update(bytes).digest("hex");
+      const uploadId = reservedId ? z.uuid().parse(reservedId) : randomUUID(), digest = createHash("sha256").update(bytes).digest("hex");
       let candidate: { fileId: string; filePath: string } | undefined;
       try {
         const uploaded = await client.files.upload({ file: new File([new Uint8Array(bytes)], `${uploadId}.png`, { type: "image/png" }), fileName: `${uploadId}.png`, folder: configuration.folder,
@@ -72,8 +73,9 @@ export function buildImageKitStore(configuration: Configuration, dependencies: {
         // exact generated path after confirming identity; never a supplied ID.
         if (candidate) {
           try { const actual = await client.files.get(candidate.fileId); if (actual.filePath === candidate.filePath) await client.files.delete(candidate.fileId); }
-          catch { /* Ambiguous/private orphan retained for the scoped audit procedure. */ }
+          catch { securityDiagnostic("EVIDENCE_ORPHAN_REVIEW"); }
         }
+        else securityDiagnostic("EVIDENCE_ORPHAN_REVIEW");
         throw new FoundationError("UNAVAILABLE");
       }
     },

@@ -89,7 +89,7 @@ export function evidenceStore(source = process.env) {
     return buildEvidenceStore(privateStorageConfiguration(source));
   };
   return {
-    async put(input: Buffer, declaredType?: string) { return provider === "imagekit" ? remote().putNormalized(await normalizeEvidence(input, declaredType)) : legacy().put(input, declaredType); },
+    async put(input: Buffer, declaredType?: string, reservedId?: string) { return provider === "imagekit" ? remote().putNormalized(await normalizeEvidence(input, declaredType), reservedId) : legacy().put(input, declaredType); },
     async get(ref: string, digest: string) { return ref.startsWith("imagekit:") ? remote().get(ref, digest) : legacy().get(ref, digest); },
     async remove(ref: string) { return ref.startsWith("imagekit:") ? remote().remove(ref) : legacy().remove(ref); },
   };

@@ -10,4 +10,11 @@ GRANT UPDATE(state,provisioning,version) ON metro_website_order TO metro_commerc
 GRANT UPDATE(state,version) ON metro_support_issue TO metro_commerce_worker;
 GRANT INSERT ON metro_service_reference TO metro_commerce_worker;
 GRANT UPDATE(snapshot,version,"capturedAt") ON metro_service_reference TO metro_commerce_worker;
--- No access to passwords, sessions, verification tokens, payment files or OWNER binding.
+-- No passwords, sessions, verification tokens, payment files or OWNER mutation.
+-- Read-only authorization facts, not credentials or evidence storage locators.
+GRANT SELECT(slot,"userId") ON metro_owner_binding TO metro_commerce_worker;
+GRANT SELECT(id,"emailVerified") ON metro_user TO metro_commerce_worker;
+GRANT SELECT(id,"orderId","userId",decision,"ownerId","evidenceId","amountMmk","reasonCode") ON metro_payment_decision TO metro_commerce_worker;
+GRANT SELECT(id,"orderId","userId") ON metro_payment_evidence TO metro_commerce_worker;
+GRANT SELECT(id,"actorId","targetUserId",action,"resourceId","reasonCode",outcome) ON metro_owner_audit TO metro_commerce_worker;
+GRANT SELECT(id,"issueId","userId","actorId",kind,version) ON metro_issue_event TO metro_commerce_worker;

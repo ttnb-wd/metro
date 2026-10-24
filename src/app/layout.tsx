@@ -27,5 +27,5 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     try { target = new URL(candidate); } catch { /* Ignore malformed, untrusted headers. */ }
     if (target && candidate === canonicalWebsitePageUrl({ origin: process.env.BETTER_AUTH_URL, nodeEnv: process.env.NODE_ENV ?? "development" }, requestHeaders.get("host"), target.pathname, target.search)) redirect(candidate);
   }
-  return <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning><body><ThemeProvider>{children}</ThemeProvider></body></html>;
+  return <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning><body><ThemeProvider nonce={requestHeaders.get("x-metro-csp-nonce") ?? undefined}>{children}</ThemeProvider></body></html>;
 }

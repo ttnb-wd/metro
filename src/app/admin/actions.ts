@@ -45,12 +45,12 @@ export async function approvePayment(_previous: AdminActionState, form: FormData
   try {
     assertAdminOrigin(await headers());
     if (!fulfilmentEnabled() || !serviceConfigured()) throw new FoundationError("DISABLED");
-    const input = z.strictObject({ evidenceId: z.uuid(), requestKey: z.uuid(), confirmed: z.literal("yes"), transaction: z.string().trim().min(4).max(100).regex(/^[A-Za-z0-9 -]+$/) }).parse(Object.fromEntries(["evidenceId", "requestKey", "confirmed", "transaction"].map(key => [key, form.get(key)])));
+    const input = z.strictObject({ evidenceId: z.uuid(), reviewedVersion: z.coerce.number().int().nonnegative(), reviewedSha256: z.string().regex(/^[a-f0-9]{64}$/), requestKey: z.uuid(), confirmed: z.literal("yes"), transaction: z.string().trim().min(4).max(100).regex(/^[A-Za-z0-9 -]+$/) }).parse(Object.fromEntries(["evidenceId", "reviewedVersion", "reviewedSha256", "requestKey", "confirmed", "transaction"].map(key => [key, form.get(key)])));
     const target = await (await getAdminRepository()).paymentRejectionTarget(input.evidenceId);
     // Globally deduplicate a bank transaction without storing its private reference.
     const hex = createHash("sha256").update(`metro-payment:${input.transaction.replace(/[ -]/g, "").toUpperCase()}`).digest("hex");
     const verificationRef = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-    await (await getWebsiteRepositories()).decidePayment({ ...target, decision: "APPROVED", verificationRef }, { requestId: input.requestKey, idempotencyKey: input.requestKey });
+    await (await getWebsiteRepositories()).decidePayment({ ...target, reviewedVersion: input.reviewedVersion, reviewedSha256: input.reviewedSha256, decision: "APPROVED", verificationRef }, { requestId: input.requestKey, idempotencyKey: input.requestKey });
     revalidatePath("/admin", "layout"); revalidatePath("/dashboard", "layout");
     return { status: "success", message: "Payment confirmed after review. A durable VPN fulfilment request is queued; access is delivered only after verified activation." };
   } catch (error) { return { status: "error", message: adminErrorMessage(error) }; }
@@ -97,10 +97,10 @@ export async function publishPricing(_previous: AdminActionState, form: FormData
 export async function rejectPayment(_previous: AdminActionState, form: FormData): Promise<AdminActionState> {
   try {
     assertAdminOrigin(await headers());
-    const parsed = z.strictObject({ evidenceId: z.uuid(), requestKey: z.uuid(), confirmed: z.literal("yes"), rejectionReason: rejectionReasonSchema }).safeParse(Object.fromEntries(["evidenceId", "requestKey", "confirmed", "rejectionReason"].map(key => [key, form.get(key)])));
+    const parsed = z.strictObject({ evidenceId: z.uuid(), reviewedVersion: z.coerce.number().int().nonnegative(), reviewedSha256: z.string().regex(/^[a-f0-9]{64}$/), requestKey: z.uuid(), confirmed: z.literal("yes"), rejectionReason: rejectionReasonSchema }).safeParse(Object.fromEntries(["evidenceId", "reviewedVersion", "reviewedSha256", "requestKey", "confirmed", "rejectionReason"].map(key => [key, form.get(key)])));
     if (!parsed.success) throw new FoundationError("INVALID_REQUEST");
     const target = await (await getAdminRepository()).paymentRejectionTarget(parsed.data.evidenceId);
-    await (await getWebsiteRepositories()).decidePayment({ ...target, decision: "REJECTED", rejectionReason: parsed.data.rejectionReason, verificationRef: parsed.data.requestKey }, { requestId: parsed.data.requestKey, idempotencyKey: parsed.data.requestKey });
+    await (await getWebsiteRepositories()).decidePayment({ ...target, reviewedVersion: parsed.data.reviewedVersion, reviewedSha256: parsed.data.reviewedSha256, decision: "REJECTED", rejectionReason: parsed.data.rejectionReason, verificationRef: parsed.data.requestKey }, { requestId: parsed.data.requestKey, idempotencyKey: parsed.data.requestKey });
     for (const path of ["/admin", "/admin/payments", "/admin/orders", "/admin/audit", "/dashboard/orders"]) revalidatePath(path);
     return { status: "success", message: "Evidence rejected. The decision is recorded in Audit History; no payment was approved and no VPN operation was created." };
   } catch (error) { return { status: "error", message: adminErrorMessage(error) }; }
