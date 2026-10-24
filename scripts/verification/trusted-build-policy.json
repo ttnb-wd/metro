@@ -2,10 +2,17 @@
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "disposition": "MITIGATED_NOT_PATCHED",
   "acceptance": "PENDING_USER_REVIEW",
+  "upstreamStatus": "WITHDRAWN",
+  "withdrawnAt": "2026-10-23T12:53:02Z",
   "reviewBy": "2026-11-06T00:00:00Z",
+  "reviewedOverrides": {
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
+  },
   "reviewedFiles": {
     "eslint.config.mjs": "6b936c20f70100d164b17b2697dfaf755f84c6981be76b127d401474f06c779b",
-    "package.json": "cda95edb3cba04809eb657ec94f466b77c8b7b295ea2fc4dd92a3f729ded847c",
-    "package-lock.json": "04a663df82669fe4d670b3c3e05bb1fbc0be00305f447c0ae2cfc780cf4dbed9"
+    "package.json": "6dd4c46d04597ac3f79ee8028abd40fc615c7d1c4d00ad37e69d2d4f02983dbc",
+    "package-lock.json": "204f65fd670da8d0445b202bf740665c0c9fabc164c3e7e1508d90b111ec5762"
   }
 }

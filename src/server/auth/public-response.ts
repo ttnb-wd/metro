@@ -2,6 +2,7 @@ import "server-only";
 
 export function publicAuthPayload(path: string, status: number, body: unknown): unknown {
   if (status >= 400) {
+    if (path === "/reset-password" && status === 400) return { error: { code: "INVALID_RESET_LINK", message: "This reset link is invalid or expired. Request a new link and use a password with 12–128 characters." } };
     const code = body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
     if (path === "/sign-in/email" && status === 403 && code === "EMAIL_NOT_VERIFIED") {
       return { error: { code: "EMAIL_NOT_VERIFIED", message: "Verify your email before signing in. You can request a new verification email." } };

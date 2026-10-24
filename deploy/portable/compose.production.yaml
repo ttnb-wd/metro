@@ -1,0 +1,44 @@
+# Apply only on an approved, capacity-verified website host. This file never
+# starts Telegram, VPN APIs, Outline or website business workers.
+services:
+  web:
+    image: ${METRO_WEB_IMAGE:?Set an immutable reviewed website image digest}
+    env_file: ${METRO_WEB_ENV_FILE:?Set a protected allowlisted website environment file}
+    expose: ["3000"]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=128m,uid=1000,gid=1000,mode=0700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1
+    networks: [metro_web]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  proxy:
+    image: ${METRO_PROXY_IMAGE:?Set a reviewed immutable Caddy image digest}
+    environment:
+      METRO_PUBLIC_HOST: ${METRO_PUBLIC_HOST:?Use the actual approved HTTPS hostname}
+      METRO_AUTH_PROXY_SECRET: ${METRO_AUTH_PROXY_SECRET:?Set the private web ingress secret}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - metro_caddy_data:/data
+      - metro_caddy_config:/config
+    restart: unless-stopped
+    networks: [metro_web]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+networks:
+  metro_web: {}
+volumes:
+  metro_caddy_data: {}
+  metro_caddy_config: {}

@@ -35,7 +35,7 @@ function ownedOrderPath(value: string): boolean {
 export function isSafeAuthCallback(value: unknown, origin: string): boolean {
   if (typeof value !== "string" || value.includes("\\") || value.includes("%")
     || [...value].some(character => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127)) return false;
-  const callbacks = new Set([...returnPaths, "/verify-email"]);
+  const callbacks = new Set([...returnPaths, "/verify-email", "/reset-password"]);
   if (value.startsWith("/")) return callbacks.has(value) || ownedOrderPath(value) || checkoutPath(value) === value;
   try {
     const url = new URL(value);

@@ -41,7 +41,8 @@ test('security remediation adversarial checks against owned disposable PostgreSQ
   const environment={enabled:true as const,nodeEnv:'test' as const,databaseUrl:urls[0],origin,secret};
   let ownerFixtureId='';
   const email=`${randomUUID()}@example.invalid`,password=randomBytes(32).toString('base64url');let verificationToken='';
-  const auth=betterAuth(createAuthOptions(environment,app,async({url})=>{verificationToken=new URL(url).searchParams.get('token')!;}));
+  let resetToken='';
+  const auth=betterAuth(createAuthOptions(environment,app,async({url})=>{verificationToken=new URL(url).searchParams.get('token')!;},async input=>{resetToken=input.token;}));
   const prepared=(path:string,body:object,ip='203.0.113.10')=>prepareAuthRequest(new Request(origin+'/api/auth/'+path,{method:'POST',headers:{origin,'content-type':'application/json','x-forwarded-for':ip,'x-real-ip':ip},body:JSON.stringify(body)}),environment);
 
   await t.test('registration cannot set emailVerified, choose identity or acquire OWNER; verification/login/logout persist',async()=>{
@@ -58,6 +59,28 @@ test('security remediation adversarial checks against owned disposable PostgreSQ
    assert.equal(await(await auth.handler(new Request(origin+'/api/auth/get-session',{headers:{cookie}}))).json(),null);
    const verifiedBefore=await admin.user.findUniqueOrThrow({where:{id:u.id}});assert.equal(verifiedBefore.emailVerified,true);
    const replay=await auth.handler(new Request(origin+'/api/auth/verify-email?token='+encodeURIComponent(verificationToken)));assert.equal(replay.status,200);assert.equal(await admin.session.count({where:{userId:u.id}}),0);
+  });
+  await t.test('password reset is single-use under concurrency, expires and atomically revokes sessions using restricted runtime',async()=>{
+   await admin.rateLimit.deleteMany();
+   const before=await admin.user.findUniqueOrThrow({where:{email}}),login=await auth.handler(await prepared('sign-in/email',{email,password}));assert.equal(login.status,200);
+   const cookie=login.headers.getSetCookie().map(h=>h.split(';')[0]).join('; ');
+   assert.equal((await auth.handler(await prepared('request-password-reset',{email,redirectTo:'/reset-password'}))).status,200);assert.ok(resetToken);
+   await admin.verification.updateMany({where:{identifier:'reset-password:'+resetToken},data:{expiresAt:new Date(Date.now()-1000)}});
+   const newPassword=randomBytes(32).toString('base64url');
+   assert.equal((await auth.handler(await prepared('reset-password',{token:resetToken,newPassword}))).status,400);
+   await admin.rateLimit.deleteMany();
+   assert.equal((await auth.handler(await prepared('request-password-reset',{email,redirectTo:'/reset-password'}))).status,200);
+   const token=resetToken;
+   const results=await Promise.all([auth.handler(await prepared('reset-password',{token,newPassword})),auth.handler(await prepared('reset-password',{token,newPassword}))]);
+   assert.deepEqual(results.map(r=>r.status).sort(),[200,400]);
+   assert.equal(await admin.session.count({where:{userId:before.id}}),0);
+   assert.equal(await(await auth.handler(new Request(origin+'/api/auth/get-session',{headers:{cookie}}))).json(),null);
+   const after=await admin.user.findUniqueOrThrow({where:{id:before.id}});assert.equal(after.emailVerified,true);assert.equal(after.id,before.id);assert.equal(after.email,before.email);
+   await admin.rateLimit.deleteMany();
+   assert.equal((await auth.handler(await prepared('sign-in/email',{email,password}))).status,401);
+   assert.equal((await auth.handler(await prepared('sign-in/email',{email,password:newPassword}))).status,200);
+   assert.equal((await auth.handler(await prepared('reset-password',{token,newPassword:password}))).status,400);
+   await admin.rateLimit.deleteMany();
   });
   await t.test('failed logins cannot lock an unrelated verified OWNER; spoofed IPs cannot reset the account budget',async()=>{
    const secondEmail=randomUUID()+'@example.invalid';assert.equal((await auth.handler(await prepared('sign-up/email',{email:secondEmail,password,name:'Independent fixture'}))).status,200);assert.equal((await auth.handler(new Request(origin+'/api/auth/verify-email?token='+encodeURIComponent(verificationToken)))).status,200);ownerFixtureId=(await admin.user.findUniqueOrThrow({where:{email:secondEmail}})).id;await admin.ownerBinding.create({data:{slot:1,userId:ownerFixtureId}});await admin.rateLimit.deleteMany();
@@ -107,7 +130,8 @@ test('security remediation adversarial checks against owned disposable PostgreSQ
   });
   await t.test('worker rejects incomplete and contradictory backend results; payment and durable operation survive',async()=>{
    const total=(BigInt(signed.quote.quotaBytes)*2n).toString(),response={id:randomUUID(),owner:{issuer:'metro-website',subject:sessions[1].user.id},packageId,version:0,status:'ACTIVE',keyId:'audit-mock-key-only',keyStatus:'ENFORCED',expiresAt:new Date(Date.now()+86400000).toISOString(),totalBytes:total,usedBytes:'0',remainingBytes:total,usageHistoryVersion:0,observedAt:new Date().toISOString()};
-   const worker=buildFulfilmentWorker(workerDb,async()=>response,true);assert.equal((await worker.runOne()).status,'RETRY_PENDING');assert.equal((await admin.websiteOrder.findUniqueOrThrow({where:{id:order}})).state,'FULFILMENT_PENDING');assert.equal((await admin.websiteOrder.findUniqueOrThrow({where:{id:order}})).payment,'CONFIRMED');
+   const before=await admin.websiteServiceReference.findMany({orderBy:{id:'asc'},select:{id:true,version:true,snapshot:true}});
+   const worker=buildFulfilmentWorker(workerDb,async()=>response,true);assert.equal((await worker.runOne()).status,'REVIEW_REQUIRED');assert.deepEqual(await admin.websiteServiceReference.findMany({orderBy:{id:'asc'},select:{id:true,version:true,snapshot:true}}),before);assert.equal((await admin.websiteOrder.findUniqueOrThrow({where:{id:order}})).state,'REVIEW_REQUIRED');assert.equal((await admin.websiteOrder.findUniqueOrThrow({where:{id:order}})).payment,'CONFIRMED');
   });
  }finally{await app.$disconnect();await admin.$disconnect();await workerDb.$disconnect();if(dirname(resolve(directory))===resolve(tmpdir())&&basename(directory).startsWith('metro-security-audit-'))await rm(directory,{recursive:true,force:true});}
 });

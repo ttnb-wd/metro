@@ -4,7 +4,7 @@ import { PrismaClient } from "@/server/db/generated/client";
 import type { EnabledAuthEnvironment } from "@/server/env";
 import { createPgPoolConfig } from "@/server/db/connection-config";
 import { Pool } from "pg";
-import { attachDatabasePool } from "@vercel/functions";
+import { attachDatabasePool } from "@vercel/functions/db-connections";
 
 const globalForMetro = globalThis as unknown as { metroPrisma?: PrismaClient };
 

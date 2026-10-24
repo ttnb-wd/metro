@@ -4,6 +4,7 @@ import { createHmac } from "node:crypto";
 import type { EnabledAuthEnvironment } from "@/server/env";
 import { isSafeAuthCallback } from "@/server/auth/redirects";
 import { INTERNAL_AUTH_IP_HEADER } from "@/server/auth/options";
+import { trustedIngressIp, verifiedProxyRequest } from "./ingress";
 
 export const MAX_AUTH_BODY_BYTES = 16 * 1024;
 const callbackFields = ["callbackURL", "errorCallbackURL", "newUserCallbackURL", "redirectTo"];
@@ -52,6 +53,9 @@ async function readBoundedJson(request: Request): Promise<string> {
 export async function prepareAuthRequest(request: Request, environment: EnabledAuthEnvironment): Promise<Request> {
   const url = new URL(request.url);
   const configured = new URL(environment.origin);
+  // Only a pinned private proxy with canonical Host/HTTPS may normalize the
+  // framework's internal HTTP URL. External Origin checks below remain exact.
+  if (verifiedProxyRequest(request, environment)) { url.protocol = configured.protocol; url.hostname = configured.hostname; url.port = configured.port; }
   if (url.origin !== configured.origin) {
     // NextURL normalizes loopback IPs to localhost. Permit only this precise
     // development normalization, with the actual Host still matching the
@@ -93,7 +97,7 @@ export async function prepareAuthRequest(request: Request, environment: EnabledA
   // the actual hosting platform is required; client headers cannot enable it.
   // Other production hosts need their own reviewed ingress adapter, not a
   // configurable arbitrary forwarded header or a shared loopback fallback.
-  const trustedIp = environment.platform === "vercel" ? headers.get("x-real-ip")?.trim() : undefined;
+  const trustedIp = trustedIngressIp(request, environment);
   if (environment.nodeEnv === "production" && (!trustedIp || !isIP(trustedIp))) {
     throw new AuthRequestError(503, "AUTH_SOURCE_UNAVAILABLE");
   }
@@ -107,7 +111,7 @@ export async function prepareAuthRequest(request: Request, environment: EnabledA
   // IP headers. Missing development IP information never becomes a global
   // authentication bucket. The synthetic address contains no personal data.
   const digest = createHmac("sha256", environment.secret).update(identity).digest("hex").slice(0, 32);
-  for (const key of ["x-forwarded-for", "x-vercel-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "x-metro-auth-source", INTERNAL_AUTH_IP_HEADER]) headers.delete(key);
+  for (const key of ["x-forwarded-for", "x-vercel-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "x-metro-proxy-token", "x-metro-auth-source", INTERNAL_AUTH_IP_HEADER]) headers.delete(key);
   if (trustedIp && isIP(trustedIp)) headers.set("x-metro-auth-source", createHmac("sha256", environment.secret).update(`source:${trustedIp}`).digest("hex"));
   headers.set(INTERNAL_AUTH_IP_HEADER, digest.match(/.{4}/g)!.join(":"));
   return new Request(url.href, { method: request.method, headers, body, signal: request.signal });

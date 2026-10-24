@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "git": { "deploymentEnabled": false },
   "installCommand": "npm ci",
   "buildCommand": "node scripts/verification/trusted-build-policy.mjs && npm run build",
   "regions": ["sin1"]

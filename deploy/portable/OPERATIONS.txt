@@ -1,0 +1,76 @@
+METRO PORTABLE WEB RELEASE
+
+This deploys the existing real application, not a separate demo. It does not
+deploy Telegram, Outline, the VPN API or website business workers.
+
+Prerequisites: an eligible commercial host, its actual HTTPS hostname, adequate
+capacity, reachable email delivery, reviewed image digests, and protected runtime
+credentials. Do not apply this compose file to the existing busy VPN VPS without
+a separate capacity/port review. Do not use a Vercel-owned hostname on another
+provider without domain control. No hostname is invented by this package.
+
+Build from reviewed source with Node 24. The allowlisted Docker context excludes
+all environment files, local evidence, backup keys, private vaults and operator
+tooling. Build without production credentials:
+  docker build --tag metro-web:REVIEWED_RELEASE .
+Record the resulting immutable image digest and retain the previous image.
+
+Web runtime environment NAMES (values belong in a protected external env file):
+  METRO_AUTH_ENABLED
+  METRO_WEBSITE_FOUNDATION_ENABLED
+  METRO_DATABASE_RUNTIME_ROLE
+  METRO_DATABASE_URL
+  BETTER_AUTH_SECRET
+  BETTER_AUTH_URL
+  SMTP_USER
+  SMTP_APP_PASSWORD
+  METRO_EVIDENCE_PROVIDER
+  METRO_IMAGEKIT_PRIVATE_KEY
+  METRO_IMAGEKIT_URL_ENDPOINT
+  METRO_IMAGEKIT_FOLDER
+  METRO_VPN_SERVICE_ORIGIN
+  METRO_VPN_SERVICE_KEY_ID
+  METRO_VPN_SERVICE_SECRET
+  METRO_FULFILMENT_ENABLED
+  METRO_VPN_EXECUTION_APPROVED
+  METRO_VPN_FULFILMENT_RECEIPTS_VERIFIED
+  METRO_NOTIFICATIONS_ENABLED
+  METRO_NOTIFICATION_EMAIL_ENABLED
+  METRO_AUTH_PROXY_SECRET
+
+Use only the pooled metro_runtime Neon role. Exclude migration/assignment,
+commerce-worker, notification-worker, Aiven, Outline, Telegram, backup and legacy
+evidence-decryption credentials. Leave VERCEL unset on a non-Vercel host.
+
+Compose inputs: METRO_WEB_IMAGE, METRO_PROXY_IMAGE, METRO_WEB_ENV_FILE,
+METRO_PUBLIC_HOST, METRO_AUTH_PROXY_SECRET. Pin both images to reviewed digests.
+The proxy token must match the web env file; generate an independent random
+32-64-byte hex secret through protected operator tooling. Never print it.
+
+Only Caddy publishes ports. It terminates HTTPS and overwrites canonical Host,
+protocol, client-IP and private ingress-token headers. The web port is private.
+Do not add a public web port, arbitrary trusted-forwarded headers or an extra
+proxy/CDN without reviewing the ingress adapter. Protect compose/env files and
+Caddy TLS volumes; do not enable request logging of credentials.
+
+Before launch:
+  docker compose -f deploy/portable/compose.production.yaml config --quiet
+Keep all three fulfilment gates and service-email delivery false for the first
+release. Apply the compose configuration only on the approved target; verify
+HTTPS, secure sessions, exact-origin/CSRF, OWNER/customer isolation, private
+evidence, SMTP/HTTPS mail delivery, quotes and worker/API compatibility.
+
+Health: /api/health is liveness only. It is not proof of payment delivery, VPN
+enforcement or provider permission. Monitor the existing separately identifiable
+workers, retry/manual-review queues and notification delivery independently.
+
+Activation: verify the exact worker/API images, zero unexpected in-flight work,
+current receipts, recovery point and legitimate OWNER settlement review. Enable
+matching website/worker flags only after those live gates pass. Never replay
+historical payments. Enable service email only after actual HTTPS links and
+delivery are verified. An order screenshot alone does not confirm settlement.
+
+Rollback: retain prior image/env and a verified recovery point. Stop new web
+traffic/job activation first, inspect in-flight operations, and restore only the
+reviewed web image/env. Never reset databases, start legacy ungated workers,
+duplicate Telegram polling or recreate customer keys to roll back a web release.

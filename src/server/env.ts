@@ -51,6 +51,9 @@ const enabledSchema = gateSchema.extend({
   }),
   // Only configure after reviewing a proxy that overwrites this header.
   METRO_AUTH_TRUSTED_IP_HEADER: z.enum(["x-real-ip", "cf-connecting-ip"]).optional(),
+  // Self-hosted ingress only: the private reverse proxy overwrites this token
+  // and the client IP; the web port must not be publicly reachable.
+  METRO_AUTH_PROXY_SECRET: z.string().regex(/^[a-f0-9]{64,128}$/i).refine(value => new Set(value.toLowerCase()).size >= 12).optional(),
 }).superRefine((value, context) => {
   if (value.METRO_DATABASE_RUNTIME_ROLE === "metro_runtime" && value.METRO_DIRECT_DATABASE_URL !== undefined) {
     context.addIssue({ code: "custom", path: ["METRO_DIRECT_DATABASE_URL"], message: "Restricted runtime must not receive operator credentials." });
@@ -84,6 +87,7 @@ export type EnabledAuthEnvironment = {
   runtimeRole?: "neondb_owner" | "metro_runtime";
   foundationEnabled?: boolean;
   platform?: "vercel";
+  proxySecret?: string;
 };
 
 export type AuthEnvironment = EnabledAuthEnvironment | {
@@ -116,6 +120,7 @@ export function parseServerEnvironment(source: EnvironmentSource): AuthEnvironme
     runtimeRole: result.data.METRO_DATABASE_RUNTIME_ROLE,
     foundationEnabled: result.data.METRO_WEBSITE_FOUNDATION_ENABLED === "true",
     platform: source.VERCEL === "1" ? "vercel" : undefined,
+    proxySecret: source.VERCEL === "1" ? undefined : result.data.METRO_AUTH_PROXY_SECRET,
   };
 }
 
@@ -132,6 +137,7 @@ export function readServerEnvironment(): AuthEnvironment {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     METRO_AUTH_TRUSTED_IP_HEADER: process.env.METRO_AUTH_TRUSTED_IP_HEADER,
+    METRO_AUTH_PROXY_SECRET: process.env.METRO_AUTH_PROXY_SECRET,
     METRO_COMMERCE_WORKER_DATABASE_URL: process.env.METRO_COMMERCE_WORKER_DATABASE_URL,
     METRO_NOTIFICATION_WORKER_DATABASE_URL: process.env.METRO_NOTIFICATION_WORKER_DATABASE_URL,
   });

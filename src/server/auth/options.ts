@@ -4,11 +4,13 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import type { PrismaClient } from "@/server/db/generated/client";
 import type { EnabledAuthEnvironment } from "@/server/env";
 import { sendVerificationEmail, VERIFICATION_LIFETIME_SECONDS } from "@/server/email/verification";
+import { sendPasswordResetEmail, RESET_LIFETIME_SECONDS } from "@/server/email/password-reset";
 
 export const INTERNAL_AUTH_IP_HEADER = "x-metro-auth-ip";
 
 export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: PrismaClient,
-  deliverVerification: typeof sendVerificationEmail = sendVerificationEmail) {
+  deliverVerification: typeof sendVerificationEmail = sendVerificationEmail,
+  deliverReset: typeof sendPasswordResetEmail = sendPasswordResetEmail) {
   const secure = environment.origin.startsWith("https://");
   return {
     appName: "Metro",
@@ -24,6 +26,11 @@ export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: P
       minPasswordLength: 12,
       maxPasswordLength: 128,
       requireEmailVerification: true,
+      resetPasswordTokenExpiresIn: RESET_LIFETIME_SECONDS,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, token }: { user: { email: string }; token: string }) => {
+        await deliverReset({ email: user.email, token, origin: environment.origin });
+      },
       // No custom password implementation: retain Better Auth's salted scrypt.
     },
     emailVerification: {
@@ -54,10 +61,10 @@ export function createAuthOptions(environment: EnabledAuthEnvironment, prisma: P
         "/send-verification-email": { window: 60, max: 1 },
         "/verify-email": { window: 60, max: 10 },
         "/update-user": { window: 60, max: 5 },
+        "/request-password-reset": { window: 60, max: 1 },
+        "/reset-password": { window: 60, max: 5 },
       },
     },
-    // Account recovery remains outside this step.
-    disabledPaths: ["/request-password-reset", "/reset-password"],
     advanced: {
       cookiePrefix: "metro",
       useSecureCookies: secure,

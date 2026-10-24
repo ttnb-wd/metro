@@ -9,6 +9,7 @@ import { profileNameInput, profileSessionError } from "./profile";
 import { securityDiagnostic } from "../security/diagnostics";
 import { consumeAuthBudget } from "./rate-budget";
 import { getPrisma } from "../db/client";
+import { passwordRecoveryInput } from "./password-reset";
 
 function errorResponse(status: number, code: string) {
   if (status === 401 || status === 403) securityDiagnostic("AUTH_DENIED");
@@ -26,8 +27,15 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
     if (!environment.enabled) return errorResponse(503, "AUTH_DISABLED");
     const path = new URL(request.url).pathname.slice("/api/auth".length);
     if (!(request.method === "GET" && path === "/get-session")
-      && !(request.method === "POST" && ["/sign-up/email", "/sign-in/email", "/sign-out", "/send-verification-email", "/verify-email", "/update-user"].includes(path))) return errorResponse(404, "NOT_FOUND");
+      && !(request.method === "POST" && ["/sign-up/email", "/sign-in/email", "/sign-out", "/send-verification-email", "/verify-email", "/update-user", "/request-password-reset", "/reset-password"].includes(path))) return errorResponse(404, "NOT_FOUND");
     let prepared = await prepareAuthRequest(request, environment);
+    if (path === "/request-password-reset" || path === "/reset-password") {
+      if (new URL(prepared.url).search) return errorResponse(400, "INVALID_RECOVERY_REQUEST");
+      const recovery = passwordRecoveryInput(path, await prepared.clone().json());
+      if (!recovery) return errorResponse(400, "INVALID_RECOVERY_REQUEST");
+      const headers = new Headers(prepared.headers); headers.delete("content-length");
+      prepared = new Request(prepared, { headers, body: JSON.stringify(recovery) });
+    }
     if (path === "/update-user") {
       const profile = profileNameInput(await prepared.clone().json());
       if (!profile) return errorResponse(400, "INVALID_PROFILE_NAME");

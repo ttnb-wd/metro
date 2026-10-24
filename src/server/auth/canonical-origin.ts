@@ -5,8 +5,9 @@ import { isLoopbackHost, readServerEnvironment, type EnabledAuthEnvironment } fr
 import { safeReturnPath } from "@/server/auth/redirects";
 
 type AuthQuery = { next?: unknown; registered?: unknown; verified?: unknown };
+type AuthPagePath = "/login" | "/register" | "/verify-email" | "/forgot-password" | "/reset-password";
 
-export function canonicalAuthPageUrl(environment: EnabledAuthEnvironment, host: string | null, path: "/login" | "/register" | "/verify-email", query: AuthQuery): string | null {
+export function canonicalAuthPageUrl(environment: EnabledAuthEnvironment, host: string | null, path: AuthPagePath, query: AuthQuery): string | null {
   const configured = new URL(environment.origin);
   if (environment.nodeEnv === "production" || !isLoopbackHost(configured.hostname) || host === configured.host) return null;
   const aliases = ["localhost", "127.0.0.1", "[::1]"].map(hostname => {
@@ -22,7 +23,7 @@ export function canonicalAuthPageUrl(environment: EnabledAuthEnvironment, host: 
   return destination.href;
 }
 
-export async function canonicalizeAuthPage(path: "/login" | "/register" | "/verify-email", query: AuthQuery): Promise<void> {
+export async function canonicalizeAuthPage(path: AuthPagePath, query: AuthQuery): Promise<void> {
   const environment = readServerEnvironment();
   if (!environment.enabled) return;
   const destination = canonicalAuthPageUrl(environment, (await headers()).get("host"), path, query);

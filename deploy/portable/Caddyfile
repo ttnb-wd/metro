@@ -1,0 +1,19 @@
+{
+    admin off
+}
+
+{$METRO_PUBLIC_HOST} {
+    request_body {
+        max_size 4608KB
+    }
+    reverse_proxy web:3000 {
+        header_up Host {$METRO_PUBLIC_HOST}
+        header_up X-Forwarded-Proto https
+        header_up X-Real-IP {http.request.remote.host}
+        header_up X-Metro-Proxy-Token {$METRO_AUTH_PROXY_SECRET}
+        header_up -Forwarded
+        header_up -CF-Connecting-IP
+        header_up -X-Metro-Auth-Source
+        header_up -X-Metro-Auth-IP
+    }
+}

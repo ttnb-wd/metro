@@ -54,7 +54,7 @@ export function AuthForm({ mode, returnTo, registered = false, verified = false 
         <Button type="submit" className="mt-1 w-full" disabled={pending}>{pending && <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />}{pending ? (registering ? "Creating your account…" : "Signing in…") : registering ? "Create account" : "Log in"}</Button>
       </fieldset>
       {error && <p ref={errorRef} id="auth-error" role="alert" tabIndex={-1} className="auth-message mt-5">{error}</p>}
-    </form>{!registering && <p className="mt-5 text-sm"><Link className="text-link" href={`/verify-email?next=${encodeURIComponent(destination)}`}>Verify your email or resend a link</Link></p>}<p className="auth-switch">{registering ? "Already have an account?" : "New to Metro?"} <Link className="text-link ml-1" href={`${registering ? "/login" : "/register"}?next=${encodeURIComponent(destination)}`}>{registering ? "Log in" : "Create account"}</Link></p></div>
+    </form>{!registering && <div className="mt-5 grid gap-3 text-sm"><Link className="text-link min-h-11 flex items-center" href="/forgot-password">Forgot your password?</Link><Link className="text-link" href={`/verify-email?next=${encodeURIComponent(destination)}`}>Verify your email or resend a link</Link></div>}<p className="auth-switch">{registering ? "Already have an account?" : "New to Metro?"} <Link className="text-link ml-1" href={`${registering ? "/login" : "/register"}?next=${encodeURIComponent(destination)}`}>{registering ? "Log in" : "Create account"}</Link></p></div>
     {registering && <p className="mt-5 text-center text-xs leading-6 text-muted-foreground">Registration creates a website account. It does not purchase or activate a service.</p>}
   </div>;
 }

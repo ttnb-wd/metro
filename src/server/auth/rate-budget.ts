@@ -5,7 +5,7 @@ import { AuthRequestError } from "./request-policy";
 import { INTERNAL_AUTH_IP_HEADER } from "./options";
 
 export const INTERNAL_AUTH_SOURCE_HEADER = "x-metro-auth-source";
-const limits: Record<string, number> = { "/sign-in/email": 5, "/sign-up/email": 3, "/send-verification-email": 1, "/verify-email": 10, "/update-user": 5 };
+const limits: Record<string, number> = { "/sign-in/email": 5, "/sign-up/email": 3, "/send-verification-email": 1, "/verify-email": 10, "/update-user": 5, "/request-password-reset": 1, "/reset-password": 5 };
 export async function consumeAuthBudget(db: PrismaClient, request: Request) {
   if (request.method !== "POST") return;
   const path = new URL(request.url).pathname.slice("/api/auth".length), max = limits[path];

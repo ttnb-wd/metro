@@ -1,6 +1,6 @@
 "use client";
 
-export async function submitAuth(path: "sign-in/email" | "sign-up/email" | "sign-out" | "send-verification-email" | "update-user", body: Record<string, unknown>): Promise<string | null> {
+export async function submitAuth(path: "sign-in/email" | "sign-up/email" | "sign-out" | "send-verification-email" | "update-user" | "request-password-reset" | "reset-password", body: Record<string, unknown>): Promise<string | null> {
   try {
     const response = await fetch(`/api/auth/${path}`, { method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), redirect: "error" });
@@ -16,6 +16,7 @@ export async function submitAuth(path: "sign-in/email" | "sign-up/email" | "sign
       return "This sign-in page is out of date. Reload the page and try again.";
     }
     if (response.status === 503) return "This service is temporarily unavailable. Please try again shortly.";
+    if (path === "reset-password" && response.status === 400) return "This reset link is invalid or expired. Request a new link and use a password with 12–128 characters.";
     return "We could not complete this request. Check your details and try again.";
   } catch { return "We could not reach Metro. Check your connection and try again."; }
 }
