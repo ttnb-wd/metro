@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getWebsiteRepositories } from "@/server/website";
 import { readServerEnvironment } from "@/server/env";
 import { commerceRequest, commerceFailure, limitedBody } from "@/server/commerce/http";
-import { paymentMethods, commerceEnabled } from "@/server/commerce/config";
+import { paymentMethods } from "@/server/commerce/config";
 import { evidenceStorageReady } from "@/server/commerce/evidence-store";
 import { verifyCheckoutQuote } from "@/server/commerce/quote";
 import { FoundationError } from "@/server/owner/authorization";
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const { session } = await commerceRequest(request);
     const env = readServerEnvironment();
-    if (!env.enabled || !commerceEnabled() || !evidenceStorageReady()) throw new FoundationError("UNAVAILABLE");
+    if (!env.enabled || !evidenceStorageReady()) throw new FoundationError("UNAVAILABLE");
     if (!request.headers.get("content-type")?.startsWith("application/json")) throw new FoundationError("INVALID_REQUEST");
     const input = z.strictObject({ token: z.string().min(1).max(4000), requestKey: z.uuid() }).safeParse(JSON.parse((await limitedBody(request, 6000)).toString("utf8")));
     if (!input.success) throw new FoundationError("INVALID_REQUEST");

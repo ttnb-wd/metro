@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getWebsiteRepositories } from "@/server/website";
 import { readServerEnvironment } from "@/server/env";
 import { commerceRequest, commerceFailure, limitedBody } from "@/server/commerce/http";
-import { commerceEnabled } from "@/server/commerce/config";
-import { evidenceStore, normalizeEvidence } from "@/server/commerce/evidence-store";
+import { evidenceStorageReady, evidenceStore, normalizeEvidence } from "@/server/commerce/evidence-store";
 import { FoundationError } from "@/server/owner/authorization";
 import { MAX_PAYMENT_PROOF_BYTES } from "@/features/commerce/evidence-policy";
 
@@ -19,7 +18,7 @@ export async function POST(request: Request) {
   try {
     await commerceRequest(request, true, "upload");
     const env = readServerEnvironment();
-    if (!env.enabled || !commerceEnabled()) throw new FoundationError("UNAVAILABLE");
+    if (!env.enabled || !evidenceStorageReady()) throw new FoundationError("UNAVAILABLE");
     const contentType = request.headers.get("content-type") ?? "";
     if (!contentType.startsWith("multipart/form-data;")) throw new FoundationError("INVALID_REQUEST");
     const body = await limitedBody(request, MAX_PAYMENT_PROOF_BYTES + 16384);

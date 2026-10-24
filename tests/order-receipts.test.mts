@@ -42,6 +42,6 @@ test('live usage never rolls back lifetime consumption and retains only an owned
   assert.equal(rollback.status.usageKnown, false); assert.equal(rollback.status.usedBytes, null); assert.equal(rollback.lastObservedAt, saved.observedAt);
   const foreign = await liveServiceStatus({ ...reference, snapshot: { ...saved, owner: { issuer: 'metro-website', subject: randomUUID() } } }, async () => { throw Error('unavailable'); }, now);
   assert.equal(foreign.lastObservedAt, null);
-  const fresh = await liveServiceStatus(reference, async () => ({ ...saved, version: 3, observedAt: new Date(now).toISOString() }), now);
+  const fresh = await liveServiceStatus(reference, async () => ({ ...saved, observedAt: new Date(now).toISOString() }), now);
   assert.equal(fresh.status.usageKnown, true); assert.equal(fresh.status.usedBytes, '400');
 });

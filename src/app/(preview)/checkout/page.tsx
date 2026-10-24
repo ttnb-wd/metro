@@ -5,7 +5,7 @@ import { getWebsiteRepositories } from "@/server/website";
 import { requireWebsiteSession } from "@/server/auth/session";
 import { getPublicPricing } from "@/server/pricing";
 import { readServerEnvironment } from "@/server/env";
-import { paymentMethods, commerceEnabled } from "@/server/commerce/config";
+import { paymentMethods } from "@/server/commerce/config";
 import { evidenceStorageReady } from "@/server/commerce/evidence-store";
 import { signCheckoutQuote, checkoutInvoiceSchema } from "@/server/commerce/quote";
 import { CheckoutPayment } from "@/components/commerce/checkout-payment";
@@ -27,12 +27,14 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     const order = await (await getWebsiteRepositories()).order(query.draft).catch(() => notFound());
     if (order.payment !== "UNVERIFIED" || order.state !== "AWAITING_PAYMENT") redirect(`/dashboard/orders/${order.id}`);
     const saved = checkoutInvoiceSchema.safeParse(order.quoteSnapshot);
-    if (saved.success && saved.data.totalMmk === order.totalMmk.toFixed(0) && evidenceStorageReady() && commerceEnabled()) {
+    if (saved.success && saved.data.totalMmk === order.totalMmk.toFixed(0) && evidenceStorageReady()) {
       invoice = saved.data; method = saved.data.paymentMethod; draftId = order.id;
     }
   } else {
     const pricing = await getPublicPricing();
-    if (pricing.status === "READY" && method && env.enabled && evidenceStorageReady() && commerceEnabled()) {
+    // Checkout collects evidence; VPN execution remains gated at OWNER approval
+    // and in the fulfilment worker, independently of the payment form.
+    if (pricing.status === "READY" && method && env.enabled && evidenceStorageReady()) {
       try { signed = signCheckoutQuote(pricing.release, { packageId: query.package, months: Number(query.months), version: Number(query.version) }, session.user.id, method, env.secret); invoice = { ...signed.quote, paymentMethod: method }; } catch { /* A changed selection must be reviewed before paying. */ }
     }
   }
