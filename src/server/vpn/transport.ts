@@ -4,7 +4,7 @@ import https from "node:https";
 import { z } from "zod";
 import { FoundationError } from "../owner/authorization";
 export const SERVICE_VERSION = "metro-commerce.v1" as const;
-export type ServiceAction = "catalog" | "entitlement" | "credential" | "fulfil" | "replace";
+export type ServiceAction = "capabilities" | "catalog" | "entitlement" | "credential" | "fulfil" | "replace";
 export function serviceSignature(secret: string, timestamp: string, nonce: string, body: string) {
   return createHmac("sha256", secret).update(`POST\n/metro/v1/execute\n${timestamp}\n${nonce}\n${createHash("sha256").update(body).digest("hex")}`).digest("hex");
 }
