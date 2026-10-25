@@ -14,10 +14,10 @@ export function WorkspaceNavigation({ mobile = false, compact = false }: { mobil
   return <nav aria-label={compact ? "Quick workspace navigation" : "Workspace navigation"} className={compact ? "workspace-bottom-nav" : "workspace-nav"}>
     {entries.map(item => {
       const Icon = icons[item.icon];
-      const current = pathname === item.href ? "page" : compact && item.icon === "services" && pathname === "/dashboard/secure-access" ? "location" : undefined;
+      const current = pathname === item.href ? "page" : item.href !== "/dashboard" && pathname.startsWith(item.href + "/") ? "location" : compact && item.icon === "services" && pathname === "/dashboard/secure-access" ? "location" : undefined;
       const link = <Link href={item.href} aria-current={current}>
         <Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{compact && item.icon === "services" ? "Services" : item.label}</span>
-        {!compact && pathname === item.href && <span className="workspace-nav-marker" aria-hidden="true" />}
+        {!compact && current && <span className="workspace-nav-marker" aria-hidden="true" />}
       </Link>;
       return mobile && !compact ? <SheetClose asChild key={item.href}>{link}</SheetClose> : <div key={item.href}>{link}</div>;
     })}

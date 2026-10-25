@@ -13,7 +13,7 @@ import { adminHref, adminSections } from "@/config/admin";
 function AdminNavigation({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
   return <nav aria-label="Administration" className="admin-navigation">{["WORKSPACE", "COMMERCE", "OPERATIONS", "ACCOUNT"].map(group => <div key={group} className="admin-nav-group"><p>{group}</p>{adminSections.filter(section => section.group === group).map(section => {
-    const href = adminHref(section.slug); const active = pathname === href || section.slug === "customers" && pathname.startsWith("/admin/customers/");
+    const href = adminHref(section.slug); const active = pathname === href || !!section.slug && pathname.startsWith(href + "/");
     const link = <Link href={href} aria-current={active ? "page" : undefined}><span>{section.label}</span><span className="admin-nav-indicator" aria-hidden="true" /></Link>;
     return mobile ? <SheetClose asChild key={href}>{link}</SheetClose> : <div key={href}>{link}</div>;
   })}</div>)}</nav>;
@@ -21,7 +21,7 @@ function AdminNavigation({ mobile = false }: { mobile?: boolean }) {
 
 export function AdminShell({ account, children }: { account: WorkspaceAccount; children: React.ReactNode }) {
   const pathname = usePathname();
-  const current = adminSections.find(section => adminHref(section.slug) === pathname)?.label ?? "Customer details";
+  const current = adminSections.find(section => adminHref(section.slug) === pathname || !!section.slug && pathname.startsWith(adminHref(section.slug) + "/"))?.label ?? "Administration";
   return <div className="admin-root">
     <a href="#admin-content" className="skip-link">Skip to administration</a>
     <aside className="admin-sidebar"><BrandMark /><span className="admin-owner-label">OWNER CONSOLE</span><AdminNavigation /><Link href="/" className="admin-customer-link">View public website <ArrowUpRight size={14} aria-hidden="true" /></Link></aside>

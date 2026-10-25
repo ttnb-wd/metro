@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { readServerEnvironment } from "../env";
 import { getPrisma } from "../db/client";
 import { assertWebsiteDatabaseReady } from "../db/verify-target";
@@ -6,7 +7,9 @@ import { AUTH_TABLES, FOUNDATION_TABLES, WEBSITE_ROLES } from "../db/target-poli
 import { buildRepositories } from "./repositories";
 import { FoundationError, createOwnerAuthorization } from "../owner/authorization";
 
-export async function foundationDatabase() {
+// Only schema/role readiness is shared within this render. Repositories retain
+// their own persisted session, ownership and recent-authentication checks.
+export const foundationDatabase = cache(async () => {
   const environment = readServerEnvironment();
   if (!environment.enabled || !environment.foundationEnabled || environment.runtimeRole !== WEBSITE_ROLES.runtime) throw new FoundationError("DISABLED");
   try {
@@ -27,7 +30,7 @@ export async function foundationDatabase() {
     if (!state || state.unsafe || !state.migrated || required.some(table => !state.tables.includes(table)) || state.tables.some(table => !allowed.includes(table))) throw new Error();
     return db;
   } catch { throw new FoundationError("UNAVAILABLE"); }
-}
+});
 
 // Production-ready factory, disabled until separately approved configuration.
 // No public order/payment/admin endpoint or VPN transport is activated here.

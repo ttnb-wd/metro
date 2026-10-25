@@ -14,6 +14,6 @@ export async function liveServiceStatus(reference: Reference, transport = callVp
       || reference.snapshot !== undefined && !previous
       || previous && (BigInt(value.usedBytes) < BigInt(previous.usedBytes) || value.usageHistoryVersion < previous.usageHistoryVersion
         || value.packageId !== previous.packageId || value.keyId !== previous.keyId || value.totalBytes !== previous.totalBytes || value.expiresAt !== previous.expiresAt)) throw new Error();
-    return { entitlement: value, status: serviceStatus(value, now ?? Date.now()), lastObservedAt: value.observedAt ?? previous?.observedAt ?? null };
-  } catch { return { entitlement: null, status: serviceStatus(null, now ?? Date.now(), false), lastObservedAt: previous?.observedAt ?? null }; }
+    return { entitlement: value, lastKnown: previous, status: serviceStatus(value, now ?? Date.now()), lastObservedAt: value.observedAt ?? previous?.observedAt ?? null };
+  } catch { return { entitlement: null, lastKnown: previous, status: serviceStatus(null, now ?? Date.now(), false), lastObservedAt: previous?.observedAt ?? null }; }
 }

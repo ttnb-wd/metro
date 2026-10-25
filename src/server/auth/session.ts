@@ -12,9 +12,13 @@ import { getAccountDestination } from "./account-routing";
 export const getWebsiteSession = cache(async (): Promise<WebsiteSession | null> => {
   const environment = readServerEnvironment();
   if (!environment.enabled) return null;
+  const requestHeaders = await headers();
+  // Browser sessions require a cookie. Anonymous navigation cannot gain an
+  // identity, so avoid opening Neon just to discover that no cookie was sent.
+  if (!requestHeaders.get("cookie")) return null;
   try {
     await assertWebsiteDatabaseReady(environment);
-    return await getAuth().api.getSession({ headers: await headers(), query: { disableCookieCache: true } });
+    return await getAuth().api.getSession({ headers: requestHeaders, query: { disableCookieCache: true } });
   } catch {
     throw new AuthUnavailableError();
   }

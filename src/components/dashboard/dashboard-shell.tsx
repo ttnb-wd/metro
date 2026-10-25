@@ -13,7 +13,7 @@ import { dashboardNavigation } from "@/config/site";
 
 export function DashboardShell({ children, account }: { children: React.ReactNode; account: WorkspaceAccount }) {
   const pathname = usePathname();
-  const current = dashboardNavigation.find(item => item.href === pathname)?.label ?? "Workspace";
+  const current = dashboardNavigation.find(item => item.href === pathname || item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))?.label ?? "Workspace";
   return <div className="workspace-root">
     <a href="#main-content" className="skip-link">Skip to workspace</a>
     <aside className="workspace-sidebar" aria-label="Workspace sidebar">

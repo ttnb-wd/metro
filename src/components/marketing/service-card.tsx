@@ -22,7 +22,7 @@ export function ServiceCard({ detailed = false, service = secureAccess, headingL
         <div className="map-connector"><span /><ArrowRight size={12} aria-hidden="true" /></div>
         <div className="map-node"><SlidersHorizontal size={19} aria-hidden="true" /><span>Guided setup</span></div>
       </div>
-      <p className="map-note">A look at the experience we’re building.</p>
+      <p className="map-note">From your own account to a private connection.</p>
     </div>
   </article>;
 }

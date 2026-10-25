@@ -3,8 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { foundationDatabase } from "../website";
 import { FoundationError } from "../owner/authorization";
 import { buildAdminRepository } from "./repository";
+import { getWebsiteSession } from "../auth/session";
 
-export async function getAdminRepository() { return buildAdminRepository(await foundationDatabase()); }
+export async function getAdminRepository() {
+  const session = await getWebsiteSession();
+  if (!session?.user.emailVerified) throw new FoundationError("UNAUTHENTICATED");
+  return buildAdminRepository(await foundationDatabase());
+}
 export async function adminPage<T>(work: () => Promise<T>): Promise<T> {
   try { return await work(); }
   catch (error) {

@@ -7,6 +7,7 @@ import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
 import "@fontsource/space-grotesk/700.css";
 import "./globals.css";
+import "@/styles/production-refinement.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { site } from "@/config/site";
 import { headers } from "next/headers";
